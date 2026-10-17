@@ -4,6 +4,8 @@
 
 任务 1 已实现 src 包安装、YAML 配置加载、Pydantic 校验和命令行配置校验。当前命令不会请求网站、写入 SQLite 或发送邮件；退出码 0 只表示配置有效，不表示网站健康。
 
+任务 1 已经 PR #13 合并。任务 2 的检查函数使用这些配置，具体接口与验证见 [页面检查模块](checker.md)；完整命令流程仍在步骤 5 接入。
+
 ## 安装与运行
 
 在仓库根目录执行 `uv sync --locked`。真实配置位于 `src/canlah_healthcheck/config/config.yaml`，与 `load_config.py`、`config.yaml.example` 同目录。
@@ -17,6 +19,8 @@ uv run --locked pytest
 ```
 
 不传 `--config` 时使用已安装包内 `config/config.yaml`，不受启动工作目录影响；部署或非可编辑安装建议用 `--config /absolute/path/config.yaml` 指定独立的可写配置位置。加载失败返回 2，参数错误由 argparse 返回 2；成功返回 0 并明确提示尚未执行健康检查。
+
+主程序入口位于 `src/canlah_healthcheck/main.py`，pyproject.toml 的命令映射为 `canlah_healthcheck.main:main`，对应测试为 `tests/test_main.py`。命令名仍为 `canlah-healthcheck`；改名后运行 `uv sync --locked` 刷新已安装入口。
 
 ## 配置规则与阅读顺序
 

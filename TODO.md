@@ -1,10 +1,10 @@
 # Canlah Healthcheck TODO
 
-更新日期：2026-10-17。当前进行步骤 1：建立 src 包结构与配置管理。
+更新日期：2026-10-18。当前进行步骤 2：页面检查与重试。
 
 - Project：[Canlah_healthcheck Tracker](https://github.com/users/ACienZ/projects/12/views/1)。
-- 当前 Issue：[步骤 1 #5](https://github.com/ACienZ/canlah-healthcheck/issues/5)。
-- 当前分支：`codex/5-src-config`。
+- 当前 Issue：[步骤 2 #6](https://github.com/ACienZ/canlah-healthcheck/issues/6)。
+- 当前分支：`codex/6-page-checks-retry`。
 - 设计：[实施设计与接口](docs/planning/implementation-plan.md)。
 - 保留 [Issue #3：注意git流程](https://github.com/ACienZ/canlah-healthcheck/issues/3) 及其现有状态、标签。
 
@@ -17,13 +17,13 @@
 
 ## 任务顺序
 
-各任务统一 P1。步骤 0 已 Done，步骤 1 为 In progress，其余 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
+各任务统一 P1。步骤 0–1 已 Done，步骤 2 为 In progress，其余 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
 
 | 步骤 | Issue | 状态 | Size |
 | --- | --- | --- | --- |
 | 0 | [固化需求、接口与实施计划](https://github.com/ACienZ/canlah-healthcheck/issues/4) | Done | S |
-| 1 | [建立 src 包结构与配置管理](https://github.com/ACienZ/canlah-healthcheck/issues/5) | In progress | M |
-| 2 | [页面检查与重试](https://github.com/ACienZ/canlah-healthcheck/issues/6) | TODO | M |
+| 1 | [建立 src 包结构与配置管理](https://github.com/ACienZ/canlah-healthcheck/issues/5) | Done | M |
+| 2 | [页面检查与重试](https://github.com/ACienZ/canlah-healthcheck/issues/6) | In progress | M |
 | 3 | [SQLite 执行与结果记录](https://github.com/ACienZ/canlah-healthcheck/issues/7) | TODO | M |
 | 4 | [Gmail SMTP 汇总告警](https://github.com/ACienZ/canlah-healthcheck/issues/8) | TODO | M |
 | 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | TODO | M |
@@ -38,7 +38,7 @@
 - [x] 更新协作约定，将 config.yaml 加入 Git 忽略规则。
 - [x] 用户已合并文档 PR #12，步骤 0 已标记 Done。
 
-## 当前子任务：步骤 1
+## 步骤 1 验收记录
 
 - [x] 核对 PR #12 已合并，Project 中 Issue #5 为 In progress。
 - [x] 核对 Issue #5 已关联 codex/5-src-config，本地分支跟踪对应远端，基线为 b958d8b。
@@ -52,10 +52,27 @@
 - [x] 配置 pytest：55 项通过，覆盖配置边界、路径解析及凭证脱敏；uv 包安装和导入已验证。
 - [x] 验证已安装命令从其他目录运行；合计 59 项 pytest 通过，sdist/wheel 构建通过且未包含真实配置。
 - [x] 检查完整 diff，补充配置使用说明与验证记录。
-- [ ] 用户审阅并通过 PR 合并后，再关闭任务并进入步骤 2。
+- [x] 用户已审阅并合并 PR #13，Project 中步骤 1 为 Done；合并提交为 71a9e54。
+
+## 当前子任务：步骤 2
+
+- [x] 核对 PR #13 已合并，Project 中 Issue #6 为 In progress。
+- [x] 从最新 main 创建并关联 codex/6-page-checks-retry，本地跟踪对应远端，基线为 71a9e54。
+- [x] 使用 uv 添加已确认的 HTTPX 同步客户端依赖，并同步环境与锁文件。
+- [x] 定义 Attempt、CheckResult，记录每次尝试及最终结果。
+- [x] 实现 check_page：完整响应计时、状态码、关键词、网络失败与重试。
+- [x] 实现 run_checks：复用客户端，顺序检查，单个失败不阻断其他目标。
+- [x] 按用户要求将检查模块归入 checker/ 包，主程序改名 main.py；同步命令映射、导入、test_main.py 与文档。
+- [x] 添加带中文注释的 pytest：36 项离线检查测试通过，连同原有测试合计 95 项通过。
+- [x] 更新设计与检查模块说明，检查完整 diff 并记录验证结果。
+- [x] uv 构建 sdist/wheel 通过，检查归档内的 checker 子包、main 入口及真实配置排除规则。
+- [x] 用户已确认当前实现并授权提交、推送和创建 PR。
+- [ ] 用户审阅并合并 PR，然后关闭 Issue、删除分支；合并后再进入步骤 3。
 
 ## 实施边界
 
-本任务仅实现包结构、配置管理及其测试；不提前实现 HTTP 检查、SQLite、邮件、cron 或 Release。目前已建立最小包目录并配置 Hatchling，uv 安装和导入验证通过；已添加 PyYAML、Pydantic 及 pytest 开发依赖，锁文件同步和导入验证通过；已实现配置加载与示例，55 项配置测试通过；最小配置校验命令行入口已实现，合计 59 项测试通过。使用方式和验证边界见 [配置说明](docs/configuration.md)。
+步骤 1 的包结构、配置管理和最小配置校验入口已合并，59 项测试通过，记录见 [配置说明](docs/configuration.md)。本任务仅实现页面检查与重试及其测试，不提前实现 SQLite、邮件、cron 或 Release；现有 CLI 仍只校验配置，完整流程在步骤 5 接入。
+
+步骤 2 已在任务分支完成实现与本地验收，待 PR 审阅合并；接口与离线验证范围见 [检查模块说明](docs/checker.md)。本机 HTTP 集成与业务 CI 在步骤 6 接入，真实网站请求尚未验证。
 
 环境复现：`uv sync --locked`。后续统一测试命令：`uv run --locked pytest`。详细运行说明在步骤 6 完成，题目要求的 README 保持 5–10 行。
