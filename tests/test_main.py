@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from canlah_healthcheck.cli import DEFAULT_CONFIG, main
+from canlah_healthcheck.main import DEFAULT_CONFIG, main
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "src/canlah_healthcheck/config/config.yaml.example"
 

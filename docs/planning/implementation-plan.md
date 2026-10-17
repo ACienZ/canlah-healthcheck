@@ -1,6 +1,6 @@
 # Canlah Healthcheck 实施设计
 
-日期：2026-10-17。状态：步骤 0 设计已合并；步骤 1 的包结构、配置加载与配置校验入口已实现并待 PR 审阅，其他模块尚未实现。当前使用说明见 [配置模块](../configuration.md)。
+设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–1 已合并；步骤 2 的页面检查与重试已在任务分支实现，待用户审阅，其他模块尚未实现。模块说明见 [配置模块](../configuration.md) 和 [页面检查](../checker.md)。
 
 ## 1. 目标、范围与技术选型
 
@@ -11,9 +11,9 @@
 | 职责 | 技术与理由 | 本轮状态 |
 | --- | --- | --- |
 | 环境 | Python 3.12、uv，沿用初始化配置 | 已有环境 |
-| 包布局 | src/canlah_healthcheck；Hatchling 构建后端，显式选择 src 包；console script 为 canlah-healthcheck | 步骤 1 已实现，待审阅 |
-| 配置 | PyYAML safe_load + Pydantic v2；参考 GmailAutomate 的配置对象方式 | 步骤 1 已实现，待审阅 |
-| HTTP | HTTPX 同步 Client；两个页面顺序执行，复用连接，便于 MockTransport 测试 | 待步骤 2；选型随本 PR 审阅 |
+| 包布局 | src/canlah_healthcheck；Hatchling 构建后端，显式选择 src 包；console script 为 canlah-healthcheck，入口映射到 main.py 中的 main | 步骤 1 已合并；步骤 2 按用户要求调整入口文件名 |
+| 配置 | PyYAML safe_load + Pydantic v2；参考 GmailAutomate 的配置对象方式 | 步骤 1 已合并 |
+| HTTP | HTTPX 同步 Client；两个页面顺序执行，复用连接，便于 MockTransport 测试 | 步骤 2 已实现，待审阅 |
 | 存储 | 标准库 sqlite3，事务管理，不引入 ORM | 待步骤 3 |
 | 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 待步骤 4 |
 | 调度 | cron + shell 启动脚本；Python fcntl.flock 非阻塞文件锁（Linux/Mac） | 待步骤 5 |
@@ -55,7 +55,7 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 
 ## 3. 模块边界与接口
 
-以下为模块接口约定；load_config 和配置校验 CLI 已实现，其余接口待后续任务。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
+以下为模块接口约定；load_config 和配置校验 CLI 已合并，checker 的两个接口已在步骤 2 实现，其余接口待后续任务。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
 
 | 模块 | 接口 | 输入输出与责任 |
 | --- | --- | --- |
@@ -71,6 +71,8 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 | cli | main(argv=None) -> int | 加载配置、锁、数据库恢复检测、检查、保存、发送与退出码 |
 
 CheckResult：目标 URL、最终成功标志、尝试列表；每次 Attempt 包含序号、UTC 开始时间、耗时秒数、最终 URL、状态码（网络错误时可空）、关键词结果（无响应时可空）及失败原因代码。失败原因可同时包含 status、latency、keyword；网络错误单独记录，不保存整页 HTML。
+
+步骤 2 具体约定：检查实现位于 `src/canlah_healthcheck/checker/checker.py`，独立的 checker 包包含 `__init__.py`；用冻结 dataclass 保存 Attempt 和 CheckResult，尝试集合为 tuple；`success` 是最后一次尝试无失败原因时为真的派生属性。原因代码为 status、latency、keyword、timeout、network；HTTPX 超时单独归类 timeout，其他 RequestError（含重定向循环）归类 network，不保存底层异常消息。读取中断时不评价不完整正文，keyword_found 为 None；已取得的响应头状态码和最终 URL 可保留。Client 由调用方创建并关闭，检查函数复用它并关闭每次响应；请求显式跟随重定向并采用配置中的阶段超时。主程序入口改名为 `src/canlah_healthcheck/main.py`，命令映射为 `canlah_healthcheck.main:main`，当前仍只校验配置，完整调度入口在步骤 5 接入。
 
 Report：待通知事件 ID 集合、统计区间、网站最终失败/漏跑/异常中断明细，以及各目标最新检查状态。历史故障即使随后恢复也报告；仅重试期间失败而最终恢复的结果留在检查历史，不生成故障邮件事件。
 
@@ -112,7 +114,7 @@ CLI 退出码建议：0=本轮健康且没有执行错误；1=至少一个目标
 | 集成 | 本机 HTTP 服务验证响应和延迟；子进程 CLI 退出码、不同工作目录、锁互斥、全流程与 cron 行生成 |
 | 发布 | CI 不连接真实服务；版本与标签匹配，测试失败阻断发布，重复发布不覆盖已有资产 |
 
-Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HTTP 和 Gmail 冒烟验证需独立执行并记录时间、命令、范围及结果，不把 mock 成功当成真实集成成功。步骤 1 已有 59 项配置和入口 pytest 测试通过；这不代表后续检查、存储、邮件或调度实现已通过验证。
+Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HTTP 和 Gmail 冒烟验证需独立执行并记录时间、命令、范围及结果，不把 mock 成功当成真实集成成功。步骤 1 已有 59 项配置和入口测试；步骤 2 新增 36 项离线检查测试，本地合计 95 项 pytest 通过。HTTPX MockTransport 与可控时钟验证请求处理、完整正文及重定向耗时、边界和重试；超时异常由测试模拟，不代表真实网络超时验证。现有 CI 仍仅检查环境，业务 pytest 接入及本机 HTTP 集成按步骤 6 实施。
 
 步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。本轮不创建 release workflow 或 Release。
 
