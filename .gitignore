@@ -6,3 +6,6 @@ __pycache__/
 .DS_Store
 .env
 .env.*
+
+# Local credentials; keep config.yaml.example tracked.
+config.yaml
