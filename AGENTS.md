@@ -5,6 +5,7 @@
 - 本目录是 Canlah AI 后端实习申请的小练习，使用独立 Git 仓库。
 - 原始要求以 `refs/requirement.md` 为准；上级目录中的旧实现和旧验证记录仅供参考，不代表本项目的决策或验证结果。
 - 当前进度维护在 `TODO.md`，确认后的需求与设计维护在 `docs/planning/`，不要在本文件中重复维护动态进度。
+- 后续新增或修改代码使用中文文档字符串和必要注释，解释职责、关键逻辑与边界；不机械复述每行代码。
 - 默认使用中文沟通；交付文件的语言按题目要求和用户确认决定。
 
 ## 工作方式
@@ -30,7 +31,7 @@
 - 提交 `uv.lock`；不提交 `.venv/`、缓存或凭证。
 - 环境复现命令：`uv sync --locked`。
 - Python 命令通过 `uv run` 执行；新增依赖前说明必要性并与用户确认。
-- 采用 `src/` 包布局；按已审阅的 `docs/planning/implementation-plan.md` 分步实现，本轮设计记录不创建业务模块。
+- 采用 `src/` 包布局；按已审阅的 `docs/planning/implementation-plan.md` 分步实现，当前仅按所选任务范围实施，不提前实现后续模块。
 - 测试统一使用 pytest，作为 uv 开发依赖；命令为 `uv run --locked pytest`。每个实现任务同步添加测试。
 - 真实配置 `config.yaml` 必须被 Git 忽略，只提交无真实凭证的 `config.yaml.example`；不在输出中泄露 SMTP 密码。
 - 题目要求的 README 为 5–10 行；详细设计、工作记录和讲解使用其他文档。
