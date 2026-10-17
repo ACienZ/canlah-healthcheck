@@ -1,6 +1,6 @@
 # Canlah Healthcheck 实施设计
 
-设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–2 已合并；步骤 3 的执行记录、漏跑/中断识别及通知状态已实现并完成本地验收，待 PR 审阅合并。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md) 和 [SQLite 存储](../storage.md)。
+设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–3 已合并；步骤 4 的邮件模块已实现并完成本地验收，用户已审阅实现，待 PR 合并。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md) 和 [汇总邮件](../notifier.md)。
 
 ## 1. 目标、范围与技术选型
 
@@ -14,8 +14,8 @@
 | 包布局 | src/canlah_healthcheck；Hatchling 构建后端，显式选择 src 包；console script 为 canlah-healthcheck，入口映射到 main.py 中的 main | 步骤 1 已合并；步骤 2 按用户要求调整入口文件名 |
 | 配置 | PyYAML safe_load + Pydantic v2；参考 GmailAutomate 的配置对象方式 | 步骤 1 已合并 |
 | HTTP | HTTPX 同步 Client；两个页面顺序执行，复用连接，便于 MockTransport 测试 | 步骤 2 已合并 |
-| 存储 | 标准库 sqlite3，事务管理，不引入 ORM | 步骤 3 已实现，待审阅；实际进程锁在步骤 5 接入 |
-| 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 待步骤 4 |
+| 存储 | 标准库 sqlite3，事务管理，不引入 ORM | 步骤 3 已合并；实际进程锁在步骤 5 接入 |
+| 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 步骤 4 已实现，待 PR 合并；真实投递另行验证 |
 | 调度 | cron + shell 启动脚本；Python fcntl.flock 非阻塞文件锁（Linux/Mac） | 待步骤 5 |
 | 测试 | pytest，uv dev 依赖；fixture、tmp_path、monkeypatch | 每步同步添加 |
 | 发布 | GitHub Actions 标签触发；GitHub Release 源码归档，不发布 PyPI | 待步骤 7 |
@@ -55,7 +55,7 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 
 ## 3. 模块边界与接口
 
-以下为模块接口约定；load_config、配置校验 CLI 和 checker 已合并，storage 的全部接口已在步骤 3 实现；实际发信和完整命令流程待步骤 4–5。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
+以下为模块接口约定；load_config、配置校验 CLI、checker 和 storage 已合并；notifier 在步骤 4 实现，完整命令流程待步骤 5。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
 
 | 模块 | 接口 | 输入输出与责任 |
 | --- | --- | --- |
@@ -77,6 +77,8 @@ CheckResult：目标 URL、最终成功标志、尝试列表；每次 Attempt �
 Report：待通知事件 ID 集合、统计区间、网站最终失败/漏跑/异常中断明细，以及各目标最新检查状态。历史故障即使随后恢复也报告；仅重试期间失败而最终恢复的结果留在检查历史，不生成故障邮件事件。
 
 步骤 3 的返回模型位于 storage/models.py：Event 表示事件，StoredCheck 封装检查 ID、运行 ID、整轮结束时间及 CheckResult；Report 分开保存 events、failed_checks 和 latest_checks，event_ids 从事件快照派生。pending_report 的 mail_interval 以分钟计，record_delivery 的 outcome 为 success/failed，attempted_at 是发送尝试开始时刻；数据库只保存固定错误码 smtp_error，不接收原始 SMTP 异常。
+
+步骤 4 实现位于 notifier/notifier.py：send_alert 接收 Report 和 MailSettings，以 EmailMessage 生成中文纯文本汇总，历史故障和最新状态分开展示，包含每次尝试、实际重试次数和 UTC 时间。SMTP_SSL 使用 create_default_context 校验证书与主机名；只在 login 时取出密码，不输出调试交互。部分收件人被拒收也抛 MailError，整批保留，重试可能重复发送给已接受者；连接、认证、发送及关闭错误脱敏。空事件报告不连接；邮件间隔和状态写入由存储及后续主程序协调，不在邮件模块内部重试或写库。详见 [邮件说明](../notifier.md)。
 
 ## 4. 状态、调度与一致性
 
@@ -123,6 +125,8 @@ CLI 退出码建议：0=本轮健康且没有执行错误；1=至少一个目标
 Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HTTP 和 Gmail 冒烟验证需独立执行并记录时间、命令、范围及结果，不把 mock 成功当成真实集成成功。步骤 1 已有 59 项配置和入口测试；步骤 2 新增 36 项离线检查测试，本地合计 95 项 pytest 通过。HTTPX MockTransport 与可控时钟验证请求处理、完整正文及重定向耗时、边界和重试；超时异常由测试模拟，不代表真实网络超时验证。现有 CI 仍仅检查环境，业务 pytest 接入及本机 HTTP 集成按步骤 6 实施。
 
 步骤 3 新增 47 项真实临时 SQLite 测试，本地合计 142 项通过，覆盖生命周期、结果及重试历史、唯一约束、重开、首次基线、漏跑区间、宽限边界、中断、长任务重叠导致的跳过、周期变化，以及通知间隔/快照/成功标记/失败保留。通过触发器故意中断写入，验证结果保存、恢复游标及通知状态的事务回滚。未运行真实 HTTP、SMTP 或 cron 集成。
+
+步骤 4 新增 19 项离线邮件测试，本地合计 161 项通过；SMTP 使用替身，验证中文 MIME、汇总内容、配置传递、TLS 上下文、异常/部分拒收脱敏、无内部重试，以及临时 SQLite 中的间隔、历史恢复和通知快照边界。未连接真实 Gmail；入口和实际进程锁仍待步骤 5。
 
 步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。本轮不创建 release workflow 或 Release。
 
