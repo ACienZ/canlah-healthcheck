@@ -1,6 +1,6 @@
 # Canlah Healthcheck 实施设计
 
-日期：2026-10-17。状态：需求已确认，本文具体接口与技术选型随步骤 0 PR 审阅；尚未实现业务代码。
+日期：2026-10-17。状态：步骤 0 设计已合并；步骤 1 的包结构、配置加载与配置校验入口已实现并待 PR 审阅，其他模块尚未实现。当前使用说明见 [配置模块](../configuration.md)。
 
 ## 1. 目标、范围与技术选型
 
@@ -11,8 +11,8 @@
 | 职责 | 技术与理由 | 本轮状态 |
 | --- | --- | --- |
 | 环境 | Python 3.12、uv，沿用初始化配置 | 已有环境 |
-| 包布局 | src/canlah_healthcheck；Hatchling 构建后端，显式选择 src 包；console script 为 canlah-healthcheck | 待步骤 1 |
-| 配置 | PyYAML safe_load + Pydantic v2；参考 GmailAutomate 的配置对象方式 | 待步骤 1 |
+| 包布局 | src/canlah_healthcheck；Hatchling 构建后端，显式选择 src 包；console script 为 canlah-healthcheck | 步骤 1 已实现，待审阅 |
+| 配置 | PyYAML safe_load + Pydantic v2；参考 GmailAutomate 的配置对象方式 | 步骤 1 已实现，待审阅 |
 | HTTP | HTTPX 同步 Client；两个页面顺序执行，复用连接，便于 MockTransport 测试 | 待步骤 2；选型随本 PR 审阅 |
 | 存储 | 标准库 sqlite3，事务管理，不引入 ORM | 待步骤 3 |
 | 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 待步骤 4 |
@@ -26,9 +26,9 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 
 ## 2. 配置与目录约定
 
-根目录 config.yaml 为本地真实配置，必须忽略提交；config.yaml.example 仅含占位信息。相对数据库和锁文件路径以配置文件所在目录为基准。CLI 默认读当前目录 config.yaml；cron 显式使用绝对配置路径，启动脚本先切换仓库目录，并使用安装时确定的 uv 绝对路径。
+配置模块位于 `src/canlah_healthcheck/config/load_config.py`；同目录 `config.yaml` 为本地真实配置，必须忽略提交，`config.yaml.example` 仅含占位信息。对应测试为 `tests/test_load_config.py`。相对数据库和锁文件路径以配置文件所在目录为基准；示例对应 `src/canlah_healthcheck/config/var/`，只跟踪 `.gitkeep`，不跟踪运行数据。CLI 默认使用包内 config/config.yaml，允许 --config 显式指定；cron 显式使用绝对配置路径，启动脚本先切换仓库目录，并使用安装时确定的 uv 绝对路径。
 
-下表是示例配置的设计，尚未生成实际配置文件。带“建议”的默认值随本文审阅，其余来自已确认需求。
+下表是配置规则，已提供包内 config.yaml.example。带“建议”的默认值随本文审阅，其余来自已确认需求。
 
 | 字段 | 默认值 / 约束 |
 | --- | --- |
@@ -55,7 +55,7 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 
 ## 3. 模块边界与接口
 
-以下为拟定 Python 接口，不是本轮实现。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
+以下为模块接口约定；load_config 和配置校验 CLI 已实现，其余接口待后续任务。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
 
 | 模块 | 接口 | 输入输出与责任 |
 | --- | --- | --- |
@@ -112,7 +112,7 @@ CLI 退出码建议：0=本轮健康且没有执行错误；1=至少一个目标
 | 集成 | 本机 HTTP 服务验证响应和延迟；子进程 CLI 退出码、不同工作目录、锁互斥、全流程与 cron 行生成 |
 | 发布 | CI 不连接真实服务；版本与标签匹配，测试失败阻断发布，重复发布不覆盖已有资产 |
 
-Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HTTP 和 Gmail 冒烟验证需独立执行并记录时间、命令、范围及结果，不把 mock 成功当成真实集成成功。当前项目尚无业务测试，本轮只验证文档和 Git 忽略规则。
+Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HTTP 和 Gmail 冒烟验证需独立执行并记录时间、命令、范围及结果，不把 mock 成功当成真实集成成功。步骤 1 已有 59 项配置和入口 pytest 测试通过；这不代表后续检查、存储、邮件或调度实现已通过验证。
 
 步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。本轮不创建 release workflow 或 Release。
 

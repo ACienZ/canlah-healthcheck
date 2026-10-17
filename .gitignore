@@ -9,3 +9,7 @@ __pycache__/
 
 # Local credentials; keep config.yaml.example tracked.
 config.yaml
+
+# Preserve the runtime directory, but never commit its data.
+/src/canlah_healthcheck/config/var/*
+!/src/canlah_healthcheck/config/var/.gitkeep

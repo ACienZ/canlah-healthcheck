@@ -1,0 +1,33 @@
+# 复制为 config.yaml 后填写 Gmail 应用专用密码；不要提交真实配置。
+targets:
+  - https://canlah.ai/
+  - https://canlah.ai/playbook/
+
+check:
+  expected_status: 200
+  keyword: Canlah
+  max_response_seconds: 5
+  request_timeout_seconds: 10
+  retries: 2
+  retry_delay_seconds: 2
+
+schedule:
+  interval_minutes: 5
+  # 允许任务延迟启动 60 秒；超过宽限仍未启动才记录漏跑。
+  grace_seconds: 60
+
+# 相对路径以本配置文件所在目录为基准。
+storage:
+  database_path: var/healthcheck.sqlite3
+  lock_path: var/healthcheck.lock
+
+mail:
+  interval_minutes: 5
+  host: smtp.gmail.com
+  port: 465
+  username: your-account@gmail.com
+  password: REPLACE_WITH_GMAIL_APP_PASSWORD
+  sender: your-account@gmail.com
+  recipients:
+    - recipient@example.com
+  timeout_seconds: 10
