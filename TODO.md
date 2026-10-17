@@ -1,10 +1,10 @@
 # Canlah Healthcheck TODO
 
-更新日期：2026-10-18。当前进行步骤 2：页面检查与重试。
+更新日期：2026-10-18。当前进行步骤 3：SQLite 执行与结果记录。
 
 - Project：[Canlah_healthcheck Tracker](https://github.com/users/ACienZ/projects/12/views/1)。
-- 当前 Issue：[步骤 2 #6](https://github.com/ACienZ/canlah-healthcheck/issues/6)。
-- 当前分支：`codex/6-page-checks-retry`。
+- 当前 Issue：[步骤 3 #7](https://github.com/ACienZ/canlah-healthcheck/issues/7)。
+- 当前分支：`codex/7-sqlite-execution-records`。
 - 设计：[实施设计与接口](docs/planning/implementation-plan.md)。
 - 保留 [Issue #3：注意git流程](https://github.com/ACienZ/canlah-healthcheck/issues/3) 及其现有状态、标签。
 
@@ -17,14 +17,14 @@
 
 ## 任务顺序
 
-各任务统一 P1。步骤 0–1 已 Done，步骤 2 为 In progress，其余 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
+各任务统一 P1。步骤 0–2 已 Done，步骤 3 为 In progress，其余 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
 
 | 步骤 | Issue | 状态 | Size |
 | --- | --- | --- | --- |
 | 0 | [固化需求、接口与实施计划](https://github.com/ACienZ/canlah-healthcheck/issues/4) | Done | S |
 | 1 | [建立 src 包结构与配置管理](https://github.com/ACienZ/canlah-healthcheck/issues/5) | Done | M |
-| 2 | [页面检查与重试](https://github.com/ACienZ/canlah-healthcheck/issues/6) | In progress | M |
-| 3 | [SQLite 执行与结果记录](https://github.com/ACienZ/canlah-healthcheck/issues/7) | TODO | M |
+| 2 | [页面检查与重试](https://github.com/ACienZ/canlah-healthcheck/issues/6) | Done | M |
+| 3 | [SQLite 执行与结果记录](https://github.com/ACienZ/canlah-healthcheck/issues/7) | In progress | M |
 | 4 | [Gmail SMTP 汇总告警](https://github.com/ACienZ/canlah-healthcheck/issues/8) | TODO | M |
 | 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | TODO | M |
 | 6 | [集成验证、CI 与说明文档](https://github.com/ACienZ/canlah-healthcheck/issues/10) | TODO | M |
@@ -54,7 +54,7 @@
 - [x] 检查完整 diff，补充配置使用说明与验证记录。
 - [x] 用户已审阅并合并 PR #13，Project 中步骤 1 为 Done；合并提交为 71a9e54。
 
-## 当前子任务：步骤 2
+## 步骤 2 验收记录
 
 - [x] 核对 PR #13 已合并，Project 中 Issue #6 为 In progress。
 - [x] 从最新 main 创建并关联 codex/6-page-checks-retry，本地跟踪对应远端，基线为 71a9e54。
@@ -67,12 +67,26 @@
 - [x] 更新设计与检查模块说明，检查完整 diff 并记录验证结果。
 - [x] uv 构建 sdist/wheel 通过，检查归档内的 checker 子包、main 入口及真实配置排除规则。
 - [x] 用户已确认当前实现并授权提交、推送和创建 PR。
-- [ ] 用户审阅并合并 PR，然后关闭 Issue、删除分支；合并后再进入步骤 3。
+- [x] 用户已审阅并合并 PR #14，Project 中步骤 2 为 Done；合并提交为 31f5ca9。
+
+## 当前子任务：步骤 3
+
+- [x] 核对 PR #14 已合并，Project 中 Issue #7 为 In progress。
+- [x] 从最新 main 创建并关联 codex/7-sqlite-execution-records，本地跟踪对应远端，基线为 31f5ca9。
+- [x] 第一段：建立 storage/ 包、SQLite 表及连接管理；记录运行、页面结果、各次尝试与最终故障事件。
+- [x] 验证唯一计划时段、重试恢复不告警、正常完成、数据库重开与事务回滚；新增 21 项测试，合计 116 项通过。
+- [x] 根据用户审阅补充四张表及字段用途、关联关系、实际重试次数、Storage 类职责和编号写入流程注释；业务逻辑不变。
+- [x] 第二段：首次调度基线、宽限边界、漏跑区间、异常中断与周期变更；不补跑历史请求。
+- [x] 第三段：通知状态记录与查询，覆盖失败保留、成功标记和幂等边界。
+- [x] 任务 3 共新增 47 项临时 SQLite 测试；全套 142 项通过，覆盖恢复/通知事务回滚和重开数据库后的幂等行为。
+- [x] 更新设计与模块说明，检查完整 diff，完成任务 3 本地验收；sdist/wheel 构建及归档内容检查通过。
+- [x] 用户授权完成任务后提交、推送并创建 PR；提交包含 Codex 共同作者署名。
+- [ ] 用户审阅并合并 PR，然后关闭 Issue、删除分支；合并后再进入步骤 4。
 
 ## 实施边界
 
-步骤 1 的包结构、配置管理和最小配置校验入口已合并，59 项测试通过，记录见 [配置说明](docs/configuration.md)。本任务仅实现页面检查与重试及其测试，不提前实现 SQLite、邮件、cron 或 Release；现有 CLI 仍只校验配置，完整流程在步骤 5 接入。
+步骤 1–2 已合并，配置、入口与页面检查共 95 项测试通过，记录见 [配置说明](docs/configuration.md) 和 [检查模块说明](docs/checker.md)。本任务仅实现 SQLite 执行、结果及调度/通知状态记录，不发送邮件，不接入 cron 或完整 CLI 流程。
 
-步骤 2 已在任务分支完成实现与本地验收，待 PR 审阅合并；接口与离线验证范围见 [检查模块说明](docs/checker.md)。本机 HTTP 集成与业务 CI 在步骤 6 接入，真实网站请求尚未验证。
+任务 3 三段已实现并完成本地验收，待 PR 审阅合并，详见 [存储模块说明](docs/storage.md)。存储接口以调用方已取得进程锁为前提，当前 CLI 仍只校验配置；实际发信在步骤 4 实现，完整流程和锁在步骤 5 接入，本机 HTTP 集成与业务 CI 在步骤 6 接入。
 
 环境复现：`uv sync --locked`。后续统一测试命令：`uv run --locked pytest`。详细运行说明在步骤 6 完成，题目要求的 README 保持 5–10 行。
