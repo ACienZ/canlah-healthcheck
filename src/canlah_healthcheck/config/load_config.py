@@ -65,6 +65,9 @@ class ScheduleSettings(Settings):
     interval_minutes: int = Field(default=5, gt=0, le=60)
     # 预期启动时间过去 60 秒后，才将未启动的任务判为漏跑。
     grace_seconds: NonNegativeSeconds = 60.0
+    # 新时段启动时，先请求旧实例退出，最多等 5 秒；仍未退出则强制结束，再等 5 秒。
+    # 这个值只控制停止旧进程的等待，与“没启动多久算漏跑”的 grace_seconds 不同。
+    stop_timeout_seconds: PositiveSeconds = 5.0
 
     # field_validator 只负责一个字段。默认在 Pydantic 完成类型/范围校验后执行，
     # 因而进入函数时 value 已经是 1~60 的整数，不会出现对零取模。
@@ -223,6 +226,11 @@ def load_config(path: Path) -> Config:
     config.storage.database_path = (base / config.storage.database_path).resolve()
     config.storage.lock_path = (base / config.storage.lock_path).resolve()
     # 先规范化路径再比较，防止不同写法实际指向同一文件。
-    if config.storage.database_path == config.storage.lock_path:
-        raise ConfigError("storage：数据库与锁文件不能使用同一路径")
+    lock = config.storage.lock_path
+    # 停止旧实例还会使用这些辅助文件，不能让进程信息意外覆盖数据库。
+    lock_files = {lock, *(lock.with_name(lock.name + suffix) for suffix in (
+        ".startup", ".owner.json", ".owner.json.tmp",
+    ))}
+    if config.storage.database_path in lock_files:
+        raise ConfigError("storage：数据库与锁及进程信息文件不能使用同一路径")
     return config

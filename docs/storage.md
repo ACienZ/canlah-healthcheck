@@ -12,7 +12,17 @@
 
 Storage 使用类来让各个读写方法共用同一连接，并统一负责连接配置、事务和关闭。它接收 checker 已生成的结果，不执行 HTTP 或重试。处理顺序是：提交 running → 调用方检查页面 → 保存各页面最终结果 → 保存每次尝试 → 为最终失败创建事件 → 标记 completed 并统一提交。
 
-当前主程序仍只校验配置，没有自动打开数据库；整轮流程与进程锁在任务 5 接入。实际流程必须先独占进程锁，然后调用 reconcile_schedule，之后才 start_run，不能在活跃运行中调用恢复检测，否则会把当前运行误记为中断。
+步骤 5 的主入口已接入数据库和实际进程锁，具体顺序见 [命令与调度说明](scheduling.md)。实际流程先独占进程锁，然后调用 reconcile_schedule，之后才 start_run，不能在活跃运行中调用恢复检测，否则会把当前运行误记为中断。
+
+## 如何判断过去发生了什么
+
+数据库里的 running 只表示“写下了开始记录，还没保存完成结果”，不能单凭它判断进程仍活着。主程序须先确认旧实例已经停止，然后才能调用 reconcile_schedule 检查过去的记录。
+
+- 旧记录仍是 running：把它改为 interrupted，并记一条待通知事件；不会继续或重新执行旧任务。
+- 记录为 completed：页面检查结果已经保存；网站可能不健康，之后的邮件也可能失败。若主入口明确传入刚终止的旧轮编号，函数也会将该轮改为 interrupted；保留检查时间与明细，中断时间记在事件中。
+- 应执行的历史时段没有启动记录：超过宽限后记 missed；部署前和当前时段不算历史漏跑。
+
+reconcile_schedule 的五段代码依次做：标记没跑完的旧任务 → 确定从哪里开始查 → 确定这次查到哪里 → 找出缺少启动记录的时段 → 保存已核对到的位置。这个函数不会发 HTTP 请求。
 
 ## 已实现接口
 
@@ -21,13 +31,13 @@ Storage 使用类来让各个读写方法共用同一连接，并统一负责连
 | `with Storage(path) as store` | 创建数据库父目录、打开连接、建表；退出时关闭连接 |
 | `store.start_run(slot, started_at) -> int` | 保存并提交 running，返回运行 ID；计划时段重复抛 DuplicateRunError |
 | `store.finish_run(run_id, results, finished_at)` | 同一事务保存整轮检查、全部尝试、最终故障事件，并将运行标记 completed |
-| `store.reconcile_schedule(now, schedule) -> list[Event]` | 确认遗留中断、核对历史漏跑、处理周期变更；返回本次新建事件 |
+| `store.reconcile_schedule(now, schedule, interrupted_run_id=None) -> list[Event]` | 给未完成或刚被终止的旧轮记中断、查历史漏跑、处理周期变更；返回本次新建事件 |
 | `store.pending_report(now, mail_interval) -> Report 或 None` | 当前轮完成且邮件间隔到期时，查询待通知快照；间隔单位为分钟 |
 | `store.record_delivery(report, outcome, attempted_at)` | 记录 success/failed 投递结果，成功才标记本报告事件；不发送邮件 |
 
 所有时间必须带时区，写入时统一为固定微秒精度的 UTC ISO 文本。slot 必须对齐分钟，开始时间不得早于 slot；结束时间不得早于开始时间。SQLite 不直接保存 Python datetime 对象，避免默认转换器丢失时区信息。
 
-completed 表示本轮已执行结束，与网站是否健康分开：存在最终失败时依然是 completed，由 checks.success 和事件表达故障。恢复的目标保留重试失败历史，但不产生最终故障事件。
+completed 表示本轮网页检查结果已保存，后续邮件可能尚未结束；它与网站是否健康分开：存在最终失败时依然是 completed，由 checks.success 和事件表达故障。恢复的目标保留重试失败历史，但不产生最终故障事件。
 
 ## 表结构与事务
 
@@ -61,7 +71,7 @@ start_run 单独提交，确保进程在请求网站期间退出时仍留下 run
 
 ## 漏跑与中断如何识别
 
-`reconcile_schedule` 必须在取得锁后、当前运行开始前调用。遗留 running 说明之前的持锁进程已退出，将其标为 interrupted 并创建事件；它记录的是恢复确认时间，不推测精确退出时刻。检测不以运行时长为依据，正常完成的长任务不会被标成中断。
+`reconcile_schedule` 必须在取得锁后、当前运行开始前调用。遗留 running 说明之前的持锁进程已退出，将其标为 interrupted 并创建事件；它记录的是恢复确认时间，不推测精确退出时刻。函数本身不按运行时长杀进程；步骤 5 的入口先终止仍占用旧时段的实例，再调用它记中断。
 
 首次核对仅以当前 UTC 计划时段建立基线，不追溯部署前的历史。后续从 schedule_state.next_slot 开始，核对严格超过 grace_seconds 且早于当前时段的计划启动时间；当前实际即将执行的时段始终排除，即使启动已晚于宽限，也不会被本轮自己记成漏跑。
 
@@ -69,13 +79,13 @@ start_run 单独提交，确保进程在请求网站期间退出时仍留下 run
 
 事件和检测游标同事务提交。重复核对、进程重开不会重记已核对区间；事务失败时游标、中断状态和事件全部回滚。周期变更时重新建立当前时段基线，保存 schedule_changed 审计事件，不按新周期回溯旧历史；该审计事件本身不触发故障邮件。周期变化仍须同时修改 cron，后续部署文档说明。
 
-主机持续停机期间不能自己发送告警；需要下一次启动后才能识别。实际进程锁和 cron 尚待任务 5 接入，本次只验证持锁前提下的存储逻辑。
+主机持续停机期间不能自己发送告警；需要下一次启动后才能识别。这是任务 3 当时的存储边界；步骤 5 的实际终止、拿锁和新轮执行见 [调度说明](scheduling.md)。
 
 ## 报告与通知状态
 
 有 running 记录时不生成报告；无故障事件或间隔未到时也返回 None。成功或失败的上次通知尝试均推进最小邮件间隔。首次故障没有既往尝试，可在当前轮完成后立即生成报告；不会修改任何通知标记。
 
-Report 固定本次 event_ids，同时包含历史失败详情 failed_checks、各已记录目标的最新已完成结果 latest_checks，以及统计区间。旧故障即使后来恢复也保留，不能只从最新失败状态推导待通知事件。查询返回前结束读事务，避免 SMTP 等待期间占用数据库读锁。
+Report 固定本次 event_ids，同时包含历史失败详情 failed_checks、各已记录目标最新保存的结果 latest_checks（包括检查已保存、邮件阶段被终止的轮），以及统计区间。旧故障即使后来恢复也保留，不能只从最新失败状态推导待通知事件。查询返回前结束读事务，避免 SMTP 等待期间占用数据库读锁。
 
 邮件模块将调用 record_delivery(report, outcome, attempted_at)，outcome 仅接受 success/failed，attempted_at 为发送尝试开始时刻。成功将本报告的事件标记 notified_at；报告生成后新增的事件保持未通知。失败只记投递历史，事件留待下一次；底层 SMTP 异常原文和凭证不传入数据库，只保存固定分类 smtp_error。
 
@@ -85,6 +95,6 @@ Report 固定本次 event_ids，同时包含历史失败详情 failed_checks、�
 
 2026-10-18，本机 Python 3.12：`uv run --locked pytest -q` 共 142 项通过，其中任务 3 新增 47 项存储测试。`tests/test_storage.py` 使用 tmp_path 创建真实临时 SQLite 文件，并以独立连接读取提交后的内容，覆盖生命周期、结果和重试记录、唯一约束、重开、事务回滚与参数绑定，以及首次基线、宽限边界、漏跑区间、恢复中断、长任务跳过时段、周期变化、通知快照、间隔与投递状态一致性。
 
-测试没有创建项目 config/var 下的数据库，没有访问 HTTP 或 SMTP。未进行真实 cron/进程锁或邮件联调。现有 Actions 仅检查环境，业务 pytest 在任务 6 接入；任务 3 保持 In progress，待用户审阅合并后再完成。
+测试没有创建项目 config/var 下的数据库，没有访问 HTTP 或 SMTP。未进行真实 cron/进程锁或邮件联调。现有 Actions 仅检查环境，业务 pytest 在任务 6 接入；以上是任务 3 当时的验证记录，任务 3 现已合并。步骤 5 追加 2 项存储测试，验证显式终止的旧轮只记一次中断、保留已保存的检查时间和明细；当前全套测试为 240 项。
 
 `uv build --out-dir /tmp/canlah-task3-dist` 构建 sdist/wheel 成功；归档检查确认包含 storage 的 schema/models/读写模块，未包含真实 config.yaml 或 SQLite 数据库。本地文档链接及 diff 空白检查通过。

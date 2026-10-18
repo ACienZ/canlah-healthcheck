@@ -1,10 +1,10 @@
 # Canlah Healthcheck TODO
 
-更新日期：2026-10-18。当前进行步骤 4：Gmail SMTP 汇总告警。
+更新日期：2026-10-18。当前进行步骤 5：命令入口与 cron 调度。
 
 - Project：[Canlah_healthcheck Tracker](https://github.com/users/ACienZ/projects/12/views/1)。
-- 当前 Issue：[步骤 4 #8](https://github.com/ACienZ/canlah-healthcheck/issues/8)。
-- 当前分支：`codex/8-gmail-smtp-alerts`。
+- 当前 Issue：[步骤 5 #9](https://github.com/ACienZ/canlah-healthcheck/issues/9)。
+- 当前分支：`codex/9-cli-cron`。
 - 设计：[实施设计与接口](docs/planning/implementation-plan.md)。
 - 保留 [Issue #3：注意git流程](https://github.com/ACienZ/canlah-healthcheck/issues/3) 及其现有状态、标签。
 
@@ -17,7 +17,7 @@
 
 ## 任务顺序
 
-各任务统一 P1。步骤 0–3 已 Done，步骤 4 为 In progress，其余 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
+各任务统一 P1。步骤 0–4 已 Done，步骤 5 为 In progress，其余 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
 
 | 步骤 | Issue | 状态 | Size |
 | --- | --- | --- | --- |
@@ -25,8 +25,8 @@
 | 1 | [建立 src 包结构与配置管理](https://github.com/ACienZ/canlah-healthcheck/issues/5) | Done | M |
 | 2 | [页面检查与重试](https://github.com/ACienZ/canlah-healthcheck/issues/6) | Done | M |
 | 3 | [SQLite 执行与结果记录](https://github.com/ACienZ/canlah-healthcheck/issues/7) | Done | M |
-| 4 | [Gmail SMTP 汇总告警](https://github.com/ACienZ/canlah-healthcheck/issues/8) | In progress | M |
-| 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | TODO | M |
+| 4 | [Gmail SMTP 汇总告警](https://github.com/ACienZ/canlah-healthcheck/issues/8) | Done | M |
+| 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | In progress | M |
 | 6 | [集成验证、CI 与说明文档](https://github.com/ACienZ/canlah-healthcheck/issues/10) | TODO | M |
 | 7 | [首次发布自动化](https://github.com/ACienZ/canlah-healthcheck/issues/11) | TODO | M |
 
@@ -83,7 +83,7 @@
 - [x] 用户授权完成任务后提交、推送并创建 PR；提交包含 Codex 共同作者署名。
 - [x] 用户已审阅并合并 PR #15，Issue #7 已关闭、远端分支已删除，Project 为 Done；合并提交为 d98fb26。
 
-## 当前子任务：步骤 4
+## 步骤 4 验收记录
 
 - [x] 核对 PR #15 已合并、Issue #7 已关闭；将 Project 中 Issue #8 从 TODO 调整为 In progress。
 - [x] 从最新 main 创建并关联 codex/8-gmail-smtp-alerts，本地跟踪对应远端，基线为 d98fb26。
@@ -93,12 +93,29 @@
 - [x] sdist/wheel 构建通过，归档包含 notifier 子包，且未包含真实配置、运行数据库或锁文件。
 - [x] 更新设计与邮件模块说明，检查本任务 diff；未连接真实 Gmail，不将离线验证当作真实投递成功。
 - [x] 用户已审阅实现，并授权提交、推送和创建 PR；提交包含 Codex 共同作者署名。
-- [ ] 用户合并 PR、关闭 Issue 并删除分支；合并后再进入步骤 5。
+- [x] 用户已合并 PR #16，Issue #8 已关闭、远端分支已删除，Project 为 Done；合并提交为 c6d70e3。
+
+## 当前子任务：步骤 5
+
+- [x] 核对 PR #16 已合并、Issue #8 已关闭；将 Project 中 Issue #9 调整为 In progress。
+- [x] 从最新 main 创建并关联 codex/9-cli-cron，本地跟踪对应远端，基线为 c6d70e3。
+- [x] 主入口串联配置、旧实例终止、过去任务核对、检查、保存、汇总邮件及投递状态，落实 0/1/2/3 退出码。
+- [x] 新时段实例先核对并终止旧实例，拿到 flock 后再打开数据库；锁覆盖 HTTP 和 SMTP，同一时段不重复启动。
+- [x] 提供绝对路径 shell 启动器和只输出 cron 片段的辅助脚本，不安装或覆盖 crontab。
+- [x] 调度相关 74 项测试、全套 240 项 pytest 通过；shell 语法、sdist/wheel 构建与归档内容检查通过。
+- [x] 构建排除本地 .vscode/，保留其原文件；归档不包含真实配置、数据库、锁或日志。
+- [x] 同步白话注释、设计、使用说明与 Issue #9 中的新规则，已检查完整 diff；用户已审阅实现。
+- [x] 按用户本轮审阅修改：新时段启动时终止仍未结束的旧实例，确认停止后记中断并执行新一轮，不补跑旧任务；邮件阶段被终止也记中断并保留检查结果。
+- [x] 用户已批准并通过 uv 新增 psutil；完成 PID/创建时间/锁文件身份检查、终止等待上限及真实子进程接替测试。
+- [x] 已把 reconcile_schedule 的职责和五段逻辑改为白话说明，说明“补上数据库状态”不表示重新执行旧任务。
+- [x] 只加载用户现有真实配置，字段校验通过；没有请求网站、连接 SMTP 或输出配置内容。
+- [x] 用户已审阅实现，授权提交、推送并创建 PR；提交包含 Codex 共同作者署名。
+- [ ] 用户合并 PR、关闭 Issue 并删除分支；合并后再进入步骤 6。
 
 ## 实施边界
 
-步骤 1–3 已合并，配置、入口、页面检查及 SQLite 共 142 项测试通过，记录见 [配置说明](docs/configuration.md)、[检查模块说明](docs/checker.md) 和 [存储模块说明](docs/storage.md)。
+步骤 1–4 已合并，配置、检查、SQLite 和邮件的历史验收记录见 [配置说明](docs/configuration.md)、[检查说明](docs/checker.md)、[存储说明](docs/storage.md) 和 [邮件说明](docs/notifier.md)。
 
-步骤 4 邮件模块已实现并完成本地验收，用户已审阅实现，待 PR 合并；新增 19 项测试，详见 [邮件模块说明](docs/notifier.md)。当前 CLI 仍只校验配置；本任务不主动发送真实邮件，完整流程和进程锁在步骤 5 接入，本机 HTTP 集成与业务 CI 在步骤 6 接入。
+步骤 5 已完成本地验收，用户已审阅实现，待 PR 合并；接入完整命令与实际进程锁，新增 cron 启动器及生成辅助脚本；本地验证进度见上方清单及 [命令与调度说明](docs/scheduling.md)。不安装系统定时任务，不发送真实邮件；本机 HTTP 集成与业务 CI 仍在步骤 6。
 
-环境复现：`uv sync --locked`。后续统一测试命令：`uv run --locked pytest`。详细运行说明在步骤 6 完成，题目要求的 README 保持 5–10 行。
+环境复现：`uv sync --locked`。统一测试命令：`uv run --locked pytest`。详细部署文档在步骤 6 汇总，题目要求的 README 保持 5–10 行。

@@ -6,7 +6,7 @@
 
 `send_alert(report, mail_settings) -> None` 将一个 `Report` 快照生成一封纯文本邮件并发送，失败抛出可展示的 `MailError`。它不查询数据库、不计算邮件间隔，也不修改事件通知状态。
 
-完整入口在步骤 5 接入，约定顺序如下：
+完整入口已在步骤 5 接入，顺序如下（详见 [命令与调度说明](scheduling.md)）：
 
 1. 当前检查完成后，调用 `Storage.pending_report(now, mail.interval_minutes)`。
 2. 返回 `None` 说明无事件、间隔未到或仍有运行，不调用发信；首次事件可以立即发送。
@@ -39,4 +39,4 @@ SMTP 接收后、数据库提交前崩溃，或邮件已被接受但关闭连接
 
 `uv run --locked pytest tests/test_notifier.py -q`：19 项离线测试通过。覆盖中文 MIME 往返解析、TLS 校验设置、配置参数、汇总内容、未知响应数据、空报告、连接/认证/发送/关闭失败、部分/全部拒收、凭证脱敏，以及临时 SQLite 中的间隔、恢复后历史故障、成功标记和快照边界。
 
-全套 `uv run --locked pytest`：161 项通过。没有连接真实 Gmail 或网站；未执行真实 cron 和进程锁测试。主程序当前仍只校验配置，步骤 5 才整合实际调用；现有 Actions 仍仅检查环境，业务 pytest CI 在步骤 6 接入。
+全套 `uv run --locked pytest`：161 项通过。没有连接真实 Gmail 或网站；以上为步骤 4 当时的验证范围；步骤 5 已整合入口及真实进程锁测试，尚未安装系统 cron；现有 Actions 仍仅检查环境，业务 pytest CI 在步骤 6 接入。
