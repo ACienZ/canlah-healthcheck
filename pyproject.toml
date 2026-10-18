@@ -5,6 +5,7 @@ description = "Canlah website healthcheck exercise"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28,<0.29",
+    "psutil>=7.2,<8",
     "pydantic>=2,<3",
     "pyyaml>=6.0.3",
 ]
@@ -15,6 +16,10 @@ canlah-healthcheck = "canlah_healthcheck.main:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+# 本地未跟踪的编辑器设置不应进入源码归档；保留开发者自己的文件。
+exclude = ["/.vscode"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/canlah_healthcheck"]

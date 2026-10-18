@@ -15,6 +15,8 @@ schedule:
   interval_minutes: 5
   # 允许任务延迟启动 60 秒；超过宽限仍未启动才记录漏跑。
   grace_seconds: 60
+  # 请求旧实例退出后最多等 5 秒；强制结束后再等同样时长。
+  stop_timeout_seconds: 5
 
 # 相对路径以本配置文件所在目录为基准。
 storage:

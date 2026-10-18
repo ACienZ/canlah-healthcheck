@@ -1,6 +1,6 @@
 # Canlah Healthcheck 实施设计
 
-设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–3 已合并；步骤 4 的邮件模块已实现并完成本地验收，用户已审阅实现，待 PR 合并。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md) 和 [汇总邮件](../notifier.md)。
+设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–4 已合并；步骤 5 的命令流程、进程锁与 cron 辅助脚本已实现，已完成本地验收，用户已审阅实现，待 PR 合并。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md) 和 [汇总邮件](../notifier.md)。
 
 ## 1. 目标、范围与技术选型
 
@@ -14,13 +14,13 @@
 | 包布局 | src/canlah_healthcheck；Hatchling 构建后端，显式选择 src 包；console script 为 canlah-healthcheck，入口映射到 main.py 中的 main | 步骤 1 已合并；步骤 2 按用户要求调整入口文件名 |
 | 配置 | PyYAML safe_load + Pydantic v2；参考 GmailAutomate 的配置对象方式 | 步骤 1 已合并 |
 | HTTP | HTTPX 同步 Client；两个页面顺序执行，复用连接，便于 MockTransport 测试 | 步骤 2 已合并 |
-| 存储 | 标准库 sqlite3，事务管理，不引入 ORM | 步骤 3 已合并；实际进程锁在步骤 5 接入 |
-| 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 步骤 4 已实现，待 PR 合并；真实投递另行验证 |
-| 调度 | cron + shell 启动脚本；Python fcntl.flock 非阻塞文件锁（Linux/Mac） | 待步骤 5 |
+| 存储 | 标准库 sqlite3，事务管理，不引入 ORM | 步骤 3 已合并；步骤 5 已接入实际进程锁 |
+| 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 步骤 4 已合并；真实投递另行验证 |
+| 调度 | cron + shell 启动脚本；fcntl.flock 文件锁 + psutil 核对并终止旧实例（Linux/Mac） | 步骤 5 已实现并经用户审阅，待 PR 合并 |
 | 测试 | pytest，uv dev 依赖；fixture、tmp_path、monkeypatch | 每步同步添加 |
 | 发布 | GitHub Actions 标签触发；GitHub Release 源码归档，不发布 PyPI | 待步骤 7 |
 
-HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是整个响应的总时限。完整响应耗时用 monotonic/perf_counter 测量，包含重定向与响应体读取，不包含重试等待。不能把 HTTPX timeout 参数等同于 5 秒验收阈值；持续缓慢传输可能延长一轮执行，初版通过耗时判断与重叠锁处理，不承诺严格总运行时限。
+HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是整个响应的总时限。完整响应耗时用 monotonic/perf_counter 测量，包含重定向与响应体读取，不包含重试等待。不能把 HTTPX timeout 参数等同于 5 秒验收阈值；持续缓慢传输可能延长一轮执行，完整流程不承诺严格总运行时限；下一时段启动时按本轮确认的策略终止未结束的旧实例，再执行当前轮。
 
 参考：[原配置目录](https://github.com/ACienZ/GmailAutomate/tree/main/config)、[HTTPX timeout](https://www.python-httpx.org/advanced/timeouts/)、[Hatchling 构建](https://hatch.pypa.io/latest/config/build/)、[Google 应用专用密码](https://support.google.com/accounts/answer/185833)。Gmail 使用具备相应账户条件的应用专用密码，不使用普通登录密码；真实认证由部署时验证。
 
@@ -41,6 +41,7 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 | check.retry_delay_seconds | 2；非负数；最后一次失败后不再等待 |
 | schedule.interval_minutes | 5；初版限定为 60 的正整数因数，N<60 时生成 cron */N 分钟表达式，N=60 时生成每小时第 0 分钟表达式 |
 | schedule.grace_seconds | 建议 60；大于等于 0 且小于检查周期 |
+| schedule.stop_timeout_seconds | 5；正数，请求旧实例退出后最多等此时长，强制终止后再等同样时长 |
 | storage.database_path | 建议 var/healthcheck.sqlite3 |
 | storage.lock_path | 建议 var/healthcheck.lock；同一数据库必须共用同一锁 |
 | mail.interval_minutes | 5；正整数，与检查周期独立，表示邮件尝试的最小间隔 |
@@ -55,14 +56,15 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 
 ## 3. 模块边界与接口
 
-以下为模块接口约定；load_config、配置校验 CLI、checker 和 storage 已合并；notifier 在步骤 4 实现，完整命令流程待步骤 5。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
+以下为模块接口约定；config、checker、storage 和 notifier 已合并；步骤 5 已接入完整命令流程和实际进程锁。所有时间记录使用 UTC；部署 cron 的调度时区也配置为 UTC，避免本地时区/DST 与时段计算不一致；测量耗时和重试等待使用单调时钟。
 
 | 模块 | 接口 | 输入输出与责任 |
 | --- | --- | --- |
 | config | load_config(path: Path) -> Config | 读取 YAML、校验、解析路径；失败抛 ConfigError |
 | checker | check_page(target, settings, client) -> CheckResult | 完成该目标的全部尝试；返回最终状态和各次尝试，不发邮件、不写库 |
 | checker | run_checks(config, client) -> list[CheckResult] | 顺序检查所有目标，一个目标失败不阻断其他目标 |
-| storage | reconcile_schedule(now, schedule) -> list[Event] | 在已取得锁的前提下识别未完成运行与历史漏跑，幂等写入事件 |
+| storage | reconcile_schedule(now, schedule, interrupted_run_id=None) -> list[Event] | 确认旧实例停止后，标记中断并找出历史漏跑；被终止在邮件阶段的轮也记中断，结果保留 |
+| scheduler | process_lock(path, slot, stop_timeout_seconds) -> RunLock | 停止旧时段实例并取得执行锁；提供旧运行编号，登记本轮运行编号 |
 | storage | start_run(slot, started_at) -> run_id | 建立 running 记录；slot 唯一，防止同一时段重复检查 |
 | storage | finish_run(run_id, results, finished_at) -> None | 事务写入结果、最终运行状态和需通知事件 |
 | storage | pending_report(now, mail_interval) -> Report 或 None | 查询最终故障及已确认的漏跑/中断事件，不含仍在运行的检查；附最新状态并检查发送间隔 |
@@ -72,13 +74,13 @@ HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是�
 
 CheckResult：目标 URL、最终成功标志、尝试列表；每次 Attempt 包含序号、UTC 开始时间、耗时秒数、最终 URL、状态码（网络错误时可空）、关键词结果（无响应时可空）及失败原因代码。失败原因可同时包含 status、latency、keyword；网络错误单独记录，不保存整页 HTML。
 
-步骤 2 具体约定：检查实现位于 `src/canlah_healthcheck/checker/checker.py`，独立的 checker 包包含 `__init__.py`；用冻结 dataclass 保存 Attempt 和 CheckResult，尝试集合为 tuple；`success` 是最后一次尝试无失败原因时为真的派生属性。原因代码为 status、latency、keyword、timeout、network；HTTPX 超时单独归类 timeout，其他 RequestError（含重定向循环）归类 network，不保存底层异常消息。读取中断时不评价不完整正文，keyword_found 为 None；已取得的响应头状态码和最终 URL 可保留。Client 由调用方创建并关闭，检查函数复用它并关闭每次响应；请求显式跟随重定向并采用配置中的阶段超时。主程序入口改名为 `src/canlah_healthcheck/main.py`，命令映射为 `canlah_healthcheck.main:main`，当前仍只校验配置，完整调度入口在步骤 5 接入。
+步骤 2 具体约定：检查实现位于 `src/canlah_healthcheck/checker/checker.py`，独立的 checker 包包含 `__init__.py`；用冻结 dataclass 保存 Attempt 和 CheckResult，尝试集合为 tuple；`success` 是最后一次尝试无失败原因时为真的派生属性。原因代码为 status、latency、keyword、timeout、network；HTTPX 超时单独归类 timeout，其他 RequestError（含重定向循环）归类 network，不保存底层异常消息。读取中断时不评价不完整正文，keyword_found 为 None；已取得的响应头状态码和最终 URL 可保留。Client 由调用方创建并关闭，检查函数复用它并关闭每次响应；请求显式跟随重定向并采用配置中的阶段超时。主程序入口改名为 `src/canlah_healthcheck/main.py`，命令映射为 `canlah_healthcheck.main:main`，步骤 5 已接入完整调度入口。
 
 Report：待通知事件 ID 集合、统计区间、网站最终失败/漏跑/异常中断明细，以及各目标最新检查状态。历史故障即使随后恢复也报告；仅重试期间失败而最终恢复的结果留在检查历史，不生成故障邮件事件。
 
 步骤 3 的返回模型位于 storage/models.py：Event 表示事件，StoredCheck 封装检查 ID、运行 ID、整轮结束时间及 CheckResult；Report 分开保存 events、failed_checks 和 latest_checks，event_ids 从事件快照派生。pending_report 的 mail_interval 以分钟计，record_delivery 的 outcome 为 success/failed，attempted_at 是发送尝试开始时刻；数据库只保存固定错误码 smtp_error，不接收原始 SMTP 异常。
 
-步骤 4 实现位于 notifier/notifier.py：send_alert 接收 Report 和 MailSettings，以 EmailMessage 生成中文纯文本汇总，历史故障和最新状态分开展示，包含每次尝试、实际重试次数和 UTC 时间。SMTP_SSL 使用 create_default_context 校验证书与主机名；只在 login 时取出密码，不输出调试交互。部分收件人被拒收也抛 MailError，整批保留，重试可能重复发送给已接受者；连接、认证、发送及关闭错误脱敏。空事件报告不连接；邮件间隔和状态写入由存储及后续主程序协调，不在邮件模块内部重试或写库。详见 [邮件说明](../notifier.md)。
+步骤 4 实现位于 notifier/notifier.py：send_alert 接收 Report 和 MailSettings，以 EmailMessage 生成中文纯文本汇总，历史故障和最新状态分开展示，包含每次尝试、实际重试次数和 UTC 时间。SMTP_SSL 使用 create_default_context 校验证书与主机名；只在 login 时取出密码，不输出调试交互。部分收件人被拒收也抛 MailError，整批保留，重试可能重复发送给已接受者；连接、认证、发送及关闭错误脱敏。空事件报告不连接；邮件间隔和状态写入由存储及主程序协调，不在邮件模块内部重试或写库。详见 [邮件说明](../notifier.md)。
 
 ## 4. 状态、调度与一致性
 
@@ -92,21 +94,21 @@ SQLite 逻辑数据模型：
 
 步骤 3 已实现 Storage(path) 上下文和全部存储接口，共七张表（含 delivery_events 关联表）；连接启用外键，使用 Python 3.12 autocommit=False 管理事务，UTC 时间显式保存为固定精度 ISO 文本。开始记录单独提交，完成事务同时保存结果和最终故障事件；失败时回滚完成事务并保留 running。恢复检测将事件、中断状态及游标一起提交，通知记录将投递、关联关系及成功标记一起提交；查询报告使用短读事务。具体字段与测试见 [存储说明](../storage.md)。
 
-恢复检测仅核对严格超过宽限且早于当前时段的历史，当前实际即将执行时段始终排除；首次运行及周期变更以当前 UTC 时段建立基线。漏跑区间首尾均包含，以已有 runs 切分区间，不逐时段补建运行；schedule_changed 仅作审计，不单独触发故障邮件。通知报告包含所有未通知故障及各已记录目标的最新已完成结果。当前锁由调用方保证，尚未在命令入口接入，不将这些存储测试表述为实际 cron/锁或 SMTP 联调成功。
+恢复检测仅核对严格超过宽限且早于当前时段的历史，当前实际即将执行时段始终排除；首次运行及周期变更以当前 UTC 时段建立基线。漏跑区间首尾均包含，以已有 runs 切分区间，不逐时段补建运行；schedule_changed 仅作审计，不单独触发故障邮件。通知报告包含所有未通知故障及各已记录目标最新保存的结果（包括邮件阶段被终止但已保存的检查结果）。步骤 5 在命令入口通过真实 flock 保证调用方独占；步骤 3 的存储测试仍不代表系统 cron 或真实 SMTP 联调成功。
 
-执行顺序：
+执行顺序（2026-10-18 按用户审阅修改）：
 
-1. 加载配置，取得非阻塞 flock；持有锁直到包括邮件在内的整轮流程结束。无法取得锁则退出，不发请求、不改数据库。
-2. 取得锁后，旧 running 记录说明上一进程已退出，标记 interrupted 并生成事件；不能仅按运行时间长就判断中断。
-3. 按整点对齐的 UTC 分钟时段核对已结束且超过宽限的预期启动时间；仅从首次启动基线开始检测，漏跑缺口按连续范围记录，不逐次发请求。当前轮的实际启动不被同一事务误记为漏跑。
-4. 同一时段已有运行则跳过重复启动；否则记录 running，执行当前轮两个页面检查。
-5. 原子保存结果、最终故障事件和结束状态；执行过程异常退出时保留可恢复的 running 记录。
-6. 完成当前轮后，查询未通知事件及发送间隔。首次出现事件可立即发送；无事件不发空邮件。后续成功或失败尝试均推进邮件间隔，避免 SMTP 故障时过频重试。
-7. 发送成功，事务保存 delivery 并标记本批事件；失败保存失败尝试而不标记事件。邮件周期到期只在下一次正常运行结束后处理，不启动独立等待进程。
+1. 加载配置并计算当前 UTC 时段。尝试拿锁；旧时段实例仍在执行时，通过 PID、创建时间和打开的锁文件确认身份，发送 SIGTERM，最多等 stop_timeout_seconds，再发送 SIGKILL 并最多等同样时长。
+2. 确认旧实例停止且实际拿到锁后才打开数据库，并按实际开始时刻重算当前时段，避免等待期间跨时段后误跑旧时段；无法确认身份或停止失败返回 2。同一时段、同时处理接替或自身/父辈保护返回 3，不能绕过锁并行执行。
+3. 旧 running 改为 interrupted；刚终止的旧实例即使已保存检查结果、卡在邮件阶段，也改为 interrupted 并记事件，检查明细和原检查时间保留。
+4. 核对过去已超过宽限、早于当前时段的应执行时间，缺少记录就记漏跑；首次部署前不追查，不补发历史请求。
+5. 当前时段已有记录则返回 3；否则保存 running、登记运行编号、执行当前轮检查，统一保存结果、最终故障事件和 completed。
+6. 当前结果保存后，再查询未通知事件与邮件间隔。首次事件可立即发送，无事件不发空邮件；成功或失败尝试均推进邮件间隔。
+7. SMTP 成功后保存 delivery 并标记本批事件；失败保存 failed 并保留事件。整轮结束后关闭数据库、登记实例已结束并释放锁。
 
-上一轮过长导致后续 cron 因锁被跳过，待下一次取得锁后以缺失时段记录漏跑；不把跳过变成补跑。主机一直停机不能自我告警，外部心跳属于升级方案。SMTP 已接收但数据库提交前崩溃可能造成重复邮件，采用至少一次重试思路，不承诺严格一次投递。
+旧实例未结束时不再直接跳过下一时段，而是终止旧实例并执行新轮；这里不继续或重新执行旧轮。持锁者信息以 JSON 保存，更新时原子替换；另有短暂的启动锁避免两个新实例同时终止旧进程。同一数据库必须共用同一锁，本机文件系统运行。主机一直停机不能自我告警，恢复后才发现漏跑。SMTP 已接收但数据库提交前退出可能重复邮件，不承诺严格一次投递。详见 [命令与调度说明](../scheduling.md)。
 
-CLI 退出码建议：0=本轮健康且没有执行错误；1=至少一个目标重试后仍失败；2=配置、存储或邮件执行错误；3=锁冲突/同一时段重复启动。执行错误优先于网站失败；历史漏跑已记录并不使当前健康检查本身失败。cron 启动脚本保留退出码并将脱敏输出写入日志，日志轮转列入部署说明。
+CLI 退出码：0=本轮健康且没有执行错误；1=至少一个目标重试后仍失败；2=配置、存储或邮件执行错误；3=同一时段重复启动、另一个新实例正在接替或自身/父辈保护。执行错误优先于网站失败；历史漏跑已记录并不使当前健康检查本身失败。scripts/run_healthcheck.sh 使用 uv 绝对路径和 --no-sync，不在每轮同步环境，exec 保留退出码；scripts/print_cron.py 从配置生成 cron 行并在该行追加日志重定向，不安装任务。Cronie 使用 CRON_TZ=UTC；不支持此变量的 cron 要求守护进程使用 UTC。路径支持空格与引号，但拒绝百分号和换行；日志轮转及安装步骤见 [调度说明](../scheduling.md)。
 
 ## 5. pytest 验收与发布
 
@@ -126,7 +128,9 @@ Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HT
 
 步骤 3 新增 47 项真实临时 SQLite 测试，本地合计 142 项通过，覆盖生命周期、结果及重试历史、唯一约束、重开、首次基线、漏跑区间、宽限边界、中断、长任务重叠导致的跳过、周期变化，以及通知间隔/快照/成功标记/失败保留。通过触发器故意中断写入，验证结果保存、恢复游标及通知状态的事务回滚。未运行真实 HTTP、SMTP 或 cron 集成。
 
-步骤 4 新增 19 项离线邮件测试，本地合计 161 项通过；SMTP 使用替身，验证中文 MIME、汇总内容、配置传递、TLS 上下文、异常/部分拒收脱敏、无内部重试，以及临时 SQLite 中的间隔、历史恢复和通知快照边界。未连接真实 Gmail；入口和实际进程锁仍待步骤 5。
+步骤 4 新增 19 项离线邮件测试，本地合计 161 项通过；SMTP 使用替身，验证中文 MIME、汇总内容、配置传递、TLS 上下文、异常/部分拒收脱敏、无内部重试，以及临时 SQLite 中的间隔、历史恢复和通知快照边界。未连接真实 Gmail；此为步骤 4 当时的范围，步骤 5 已接入入口和实际进程锁。
+
+步骤 5 重写入口测试并新增锁与 cron 测试；本轮审阅新增 psutil 及终止旧实例策略后，相关 74 项、本地全套 240 项通过。真实 SQLite/flock 配合 HTTP、SMTP 和时钟替身验证主流程；子进程和 shell 验证跨目录、互斥、终止与强制结束后接替、进程身份保护、邮件阶段中断保留结果、日志和退出码。sdist/wheel 及运行数据排除检查通过；未安装系统 cron 或连接真实外部服务。详见 [命令与调度说明](../scheduling.md)。
 
 步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。本轮不创建 release workflow 或 Release。
 

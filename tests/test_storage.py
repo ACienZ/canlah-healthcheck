@@ -502,3 +502,23 @@ def test_invalid_notification_arguments_do_not_write(database):
         with pytest.raises(ValueError):
             store.record_delivery(report, "success", SLOT)
     assert read(database, "SELECT * FROM deliveries") == []
+
+
+@pytest.mark.parametrize("checks_saved", [False, True])
+def test_stopped_execution_is_recorded_once(database, checks_saved):
+    """新实例终止旧实例后记中断；若网页结果已保存，不丢明细和原检查结束时间。"""
+    with Storage(database) as store:
+        run_id = store.start_run(SLOT, SLOT)
+        if checks_saved:
+            store.finish_run(run_id, [result()], FINISHED)
+        now = SLOT + timedelta(minutes=5)
+        events = store.reconcile_schedule(now, ScheduleSettings(), interrupted_run_id=run_id)
+        assert [event.kind for event in events] == ["interrupted"]
+        run = read(database, "SELECT status, finished_at FROM runs")[0]
+        assert run["status"] == "interrupted"
+        assert datetime.fromisoformat(run["finished_at"]) == (FINISHED if checks_saved else now)
+        assert len(read(database, "SELECT * FROM checks")) == int(checks_saved)
+        report = store.pending_report(now, 5)
+        assert len(report.latest_checks) == int(checks_saved)
+        # 再次核对同一编号不能重复生成事件，也不能把保留下来的检查结果清掉。
+        assert store.reconcile_schedule(now, ScheduleSettings(), interrupted_run_id=run_id) == []

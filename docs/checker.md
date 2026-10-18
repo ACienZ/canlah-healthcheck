@@ -4,7 +4,7 @@
 
 任务 2 对应 Issue #6、分支 `codex/6-page-checks-retry`。实现位于 `src/canlah_healthcheck/checker/checker.py`，`checker/__init__.py` 标识检查包；测试位于 `tests/test_checker.py`，通过 `from canlah_healthcheck.checker import checker` 导入。建议从 `run_checks` 读起，再看 `check_page` 的重试循环，最后看 `_check_once` 的单次请求。
 
-`run_checks(config, client)` 按配置顺序返回每个目标的 CheckResult；`check_page(target, settings, client)` 完成一个页面的全部尝试。调用方使用 `with httpx.Client() as client` 创建并关闭客户端，两个函数复用该客户端；每次响应由检查函数关闭。主程序入口为 `src/canlah_healthcheck/main.py`，当前仍只校验配置，步骤 5 才接入整轮执行。
+`run_checks(config, client)` 按配置顺序返回每个目标的 CheckResult；`check_page(target, settings, client)` 完成一个页面的全部尝试。调用方使用 `with httpx.Client() as client` 创建并关闭客户端，两个函数复用该客户端；每次响应由检查函数关闭。主程序入口为 `src/canlah_healthcheck/main.py`，步骤 5 已接入整轮执行，具体顺序见 [命令与调度说明](scheduling.md)。
 
 ## 请求与判定
 
@@ -47,4 +47,4 @@ uv run --locked pytest -q
 
 `uv build --out-dir /tmp/canlah-task2-dist` 构建 sdist 和 wheel 成功；归档检查确认包含 checker 子包、main.py 和新的命令映射，未包含真实 config.yaml 或数据库。
 
-本次是离线单元验证；超时由替身主动抛出，不验证真实 socket 超时。本机 HTTP 集成测试在步骤 6 实施；真实站点、SMTP、SQLite 和 cron 尚未集成验证。当前 Actions 仍仅检查环境，完整 pytest 的 CI 接入也在步骤 6。
+本次是离线单元验证；超时由替身主动抛出，不验证真实 socket 超时。本机 HTTP 集成测试在步骤 6 实施；此段记录任务 2 当时的范围；SQLite、邮件和入口的后续验证见对应模块文档，真实站点和 Gmail 尚未验证。当前 Actions 仍仅检查环境，完整 pytest 的 CI 接入也在步骤 6。

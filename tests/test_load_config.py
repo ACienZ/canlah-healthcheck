@@ -72,6 +72,7 @@ def test_defaults(data, save):
     assert config.check.max_response_seconds == 5
     assert config.check.request_timeout_seconds == 10
     assert config.schedule.grace_seconds == 60
+    assert config.schedule.stop_timeout_seconds == 5
     assert config.storage.database_path.name == "healthcheck.sqlite3"
 
 
@@ -122,6 +123,10 @@ def test_absolute_path_preserved(data, save, tmp_path):
     ("schedule", "interval_minutes", 61),
     ("schedule", "grace_seconds", 300),
     ("schedule", "grace_seconds", -1),
+    ("schedule", "stop_timeout_seconds", 0),
+    ("schedule", "stop_timeout_seconds", -1),
+    ("schedule", "stop_timeout_seconds", float("inf")),
+    ("schedule", "stop_timeout_seconds", True),
     ("storage", "database_path", ""),
     ("mail", "password", ""),
     ("mail", "password", " "),
@@ -226,3 +231,11 @@ def test_error_and_traceback_do_not_expose_secret(data, save, kind):
     # 仅检查 str(exception) 不够；还要确认默认 traceback 没有显示底层异常链。
     # format_exception 返回多段字符串，用 join 拼起来再搜索测试密码。
     assert SECRET not in "".join(traceback.format_exception(caught.value))
+
+
+@pytest.mark.parametrize("suffix", [".startup", ".owner.json", ".owner.json.tmp"])
+def test_database_cannot_be_a_lock_information_file(data, save, suffix):
+    """自定义存储路径也不能让 PID 信息覆盖数据库；只加载配置，不创建文件。"""
+    data["storage"]["database_path"] = data["storage"]["lock_path"] + suffix
+    with pytest.raises(ConfigError, match="同一路径"):
+        load_config(save(data))

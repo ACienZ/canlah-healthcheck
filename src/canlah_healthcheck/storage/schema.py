@@ -25,10 +25,10 @@ SCHEMA = (
     # id：SQLite 自动分配的运行主键，供检查结果和事件引用。
     # slot：计划启动时段，例如 12:00；UNIQUE 防止同一时段重复运行。
     # started_at：实际开始时间，例如 12:00:03，与计划时间分开保存。
-    # finished_at：整轮完成或确认中断的时间，running 时必须为 NULL。
-    # status：running=开始但尚未结束；completed=整轮结果已保存；
-    #         interrupted=取得锁后确认上次异常中断。
-    # 网站失败也可 completed：程序完整执行与网站健康是两个不同结论。
+    # finished_at：检查结果保存时间；若检查未完成就中断，则记录发现时间。running 时为 NULL。
+    # status：running=开始但尚未保存结果；completed=网页结果已保存；
+    #         interrupted=旧轮中途退出或被下一轮终止（可能已保存网页结果）。
+    # 网站失败也可 completed；它表示检查结果已保存，不保证邮件阶段也已完成。
     # 最后的 CHECK 约束保证状态与 finished_at 一致，拒绝矛盾记录。
     """
     CREATE TABLE IF NOT EXISTS runs (

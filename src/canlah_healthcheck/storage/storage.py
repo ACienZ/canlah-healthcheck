@@ -1,10 +1,10 @@
 """记录运行与检查结果；使用标准库 sqlite3，不连接 HTTP 或 SMTP。
 
-整体流程：建表 → 恢复检测 → 提交 running → 调用方检查网站 → 保存结果 → 通知状态。
+整体流程：建表 → 检查过去是否中断或漏跑 → 记下本轮开始 → 检查网站 → 保存结果 → 记录邮件结果。
 阅读顺序：先看 Storage 类说明，再看 start_run、finish_run 的编号步骤，
 最后看 __init__ 的连接配置及 schema.py 的表/字段说明。
-调用方在后续任务中先取得进程锁，再打开 Storage 并执行整轮操作。
-取得锁后的恢复检测会将遗留 running 识别为中断，不按运行时长猜测进程状态。
+主程序必须先确认旧实例已停止，再调用本模块检查旧记录；否则可能把正在工作的实例误记为中断。
+数据库中的 running 只表示开始记录已写入、完成记录尚未写入，不能单凭它判断进程仍然活着。
 """
 
 from datetime import UTC, datetime, timedelta
@@ -24,7 +24,7 @@ class StorageError(RuntimeError):
 
 
 class DuplicateRunError(StorageError):
-    """同一计划时段已有运行；后续 CLI 可据此跳过重复启动。"""
+    """同一计划时段已有运行；主入口据此跳过重复启动。"""
 
 
 def _timestamp(value: datetime) -> str:
@@ -63,14 +63,14 @@ class Storage:
     连接的打开、事务配置和关闭也需要统一管理；调用方无需反复传连接。
     一个 Storage 实例持有一个连接，退出 with 时统一关闭。
 
-    典型调用顺序（主程序整合在后续任务实现）：
+    典型调用顺序（进入之前，主程序已确认没有旧实例仍在工作）：
         with Storage(config.storage.database_path) as store:
             store.reconcile_schedule(started_at, config.schedule)
             run_id = store.start_run(slot, started_at)
             results = run_checks(config, client)  # 调用方执行 HTTP 检查与重试
             store.finish_run(run_id, results, finished_at)
 
-    完成后可调用 pending_report；实际 SMTP 发送在未来邮件模块中执行，
+    完成后可调用 pending_report；实际 SMTP 发送由邮件模块执行，
     再将发送结果交给 record_delivery。数据库方法本身不会发送邮件。
 
     运行生命周期的两个独立写入事务：
@@ -81,7 +81,7 @@ class Storage:
     职责边界：本类接收检查模块已经算好的结果，不重新判断网页是否健康，
     不执行 HTTP 重试或发邮件；reconcile_schedule 记录中断和漏跑，
     pending_report/record_delivery 管理通知快照与投递结果。
-    必须通过 with 管理连接；后续实际主流程须在进入前取得进程锁。
+    必须通过 with 管理连接；进入前必须取得进程锁，避免两个实例同时处理旧记录。
     """
 
     def __init__(self, path: Path):
@@ -227,7 +227,7 @@ class Storage:
                             (f"check_failed:{check_id}", finished_text, run_id, check_id),
                         )
                 # 完成 5：全部结果写完才标记完成；离开 with 时统一提交。
-                # completed 表示进程完成本轮，不能把网站故障写成 interrupted。
+                # completed 表示检查结果已保存；网站失败另记事件，不因此把任务判为中断。
                 self._connection.execute(
                     "UPDATE runs SET status = 'completed', finished_at = ? WHERE id = ?",
                     (finished_text, run_id),
@@ -250,12 +250,19 @@ class Storage:
         )
         return _event(cursor.fetchone())
 
-    def reconcile_schedule(self, now: datetime, schedule: ScheduleSettings) -> list[Event]:
-        """取得进程锁后、start_run 之前，恢复遗留运行并幂等识别历史漏跑。
+    def reconcile_schedule(
+        self, now: datetime, schedule: ScheduleSettings, *, interrupted_run_id: int | None = None,
+    ) -> list[Event]:
+        """新一轮开始前，检查过去哪些任务中途退出、哪些时段根本没启动。
 
-        前提很重要：调用者已经独占进程锁，所以遗留 running 的原进程已退出。
-        不能在活跃运行中调用本方法，否则会把仍在执行的任务误记为中断。
-        本方法只写记录，不执行 HTTP；当前时段留给马上开始的运行，不记漏跑。
+        调用前必须拿到锁，确认没有旧实例仍在工作。此时若旧记录仍为 running，
+        就说明旧实例没来得及保存完成结果，把它改为 interrupted（未完成执行）。
+        再对照检查周期查找缺少启动记录的历史时段，记录 missed（漏跑）。
+        第一次运行不追查部署前的历史；核对过的位置会保存，下次从后面接着查。
+        这里只补充数据库记录，不继续或重新执行旧任务，也不检查当前时段的网站。
+
+        interrupted_run_id 来自刚被终止的旧实例。它可能已经保存网页结果，
+        但卡在邮件阶段；这时也标记该轮被中断，已经保存的结果和检查时间不丢弃。
         """
         now_text = _timestamp(now)
         now = now.astimezone(UTC)
@@ -264,20 +271,24 @@ class Storage:
         events = []
         try:
             with self._connection:
-                # 恢复 1：逐个确认遗留 running。状态更新和中断事件同事务保存；
-                # 重复调用时状态已变，因此不会重复产生中断事件。
+                # 1. 已确认旧实例不在工作：旧记录还写着 running，就说明它没跑完。
+                # 刚被终止的实例即使已保存检查结果，也要记下后续流程被中断。
+                # 把状态改为 interrupted，并记一条待汇总的中断事件。
+                # 两处修改一起保存；下次这条记录已不是 running，不会重复记中断。
                 for run in self._connection.execute(
-                    "SELECT id FROM runs WHERE status = 'running' ORDER BY id",
+                    """SELECT id FROM runs WHERE status = 'running'
+                    OR (id = ? AND status = 'completed') ORDER BY id""", (interrupted_run_id,),
                 ).fetchall():
                     self._connection.execute(
-                        "UPDATE runs SET status = 'interrupted', finished_at = ? WHERE id = ?",
+                        """UPDATE runs SET status = 'interrupted',
+                        finished_at = COALESCE(finished_at, ?) WHERE id = ?""",
                         (now_text, run["id"]),
                     )
                     events.append(self._insert_event(
                         "interrupted", f"interrupted:{run['id']}", now_text, run["id"],
                     ))
 
-                # 恢复 2：首次启动只建立当前时段基线，不追溯部署前的历史。
+                # 2. 确定从哪里开始查漏跑：首次启动从当前时段开始，不查部署前的历史。
                 state = self._connection.execute("SELECT * FROM schedule_state WHERE id = 1").fetchone()
                 if state is None:
                     self._connection.execute(
@@ -286,7 +297,7 @@ class Storage:
                     )
                     return events
                 if state["interval_minutes"] != schedule.interval_minutes:
-                    # 周期改变重新建立基线，不把新周期套回旧历史；只留审计事件。
+                    # 检查周期改过了：从现在重新计算，并记下这次变更，不用新周期重算旧历史。
                     events.append(self._insert_event(
                         "schedule_changed",
                         f"schedule_changed:{now_text}:{state['interval_minutes']}:{schedule.interval_minutes}",
@@ -298,8 +309,8 @@ class Storage:
                     )
                     return events
 
-                # 恢复 3：严格超过宽限才有资格判漏跑，同时排除当前即将执行时段。
-                # cutoff 恰好落在计划时段时，表示宽限刚好到期，须再等越过该边界。
+                # 3. 确定这次查到哪里：只查已超过启动宽限、而且早于当前时段的历史。
+                # 当前时段马上要执行，不能先记成漏跑；刚好到宽限边界时也先不记。
                 cutoff = now - timedelta(seconds=schedule.grace_seconds)
                 last_due = _slot(cutoff, schedule.interval_minutes)
                 if last_due == cutoff:
@@ -307,9 +318,9 @@ class Storage:
                 last_due = min(last_due, current - period)
                 first = datetime.fromisoformat(state["next_slot"])
                 if first > last_due:
-                    return events  # 也避免系统时间倒退时把检测游标往回改。
+                    return events  # 没有新的历史需要查；系统时间倒退时也不倒退核对位置。
 
-                # 恢复 4：按已有运行切分缺口，不逐分钟循环，更不发历史 HTTP 请求。
+                # 4. 对照应有时段和实际启动记录，缺少记录的连续时段记为漏跑，不补发请求。
                 # 例如应检查 00/05/10/15、实际有 00/10，得到 [05,05]、[15,15]。
                 existing = self._connection.execute(
                     "SELECT slot FROM runs WHERE slot >= ? AND slot <= ? ORDER BY slot",
@@ -332,7 +343,7 @@ class Storage:
                         "missed", f"missed:{_timestamp(start)}:{_timestamp(end)}",
                         now_text, start=start, end=end,
                     ))
-                # 恢复 5：事件和游标一起提交；下次从尚未核对的时段继续。
+                # 5. 记下已查到哪里，和漏跑事件一起保存；下次从后面的时段接着查。
                 self._connection.execute(
                     "UPDATE schedule_state SET next_slot = ? WHERE id = 1",
                     (_timestamp(last_due + period),),
@@ -391,9 +402,10 @@ class Storage:
                 events = tuple(_event(row) for row in rows)
                 # 历史故障和最新状态分开取，避免目标恢复后把未通知故障丢掉。
                 failed = tuple(self._read_check(event.check_id) for event in events if event.check_id is not None)
+                # 被终止在邮件阶段的旧轮可能已保存检查结果；仍可作为最新网站状态。
                 latest_ids = self._connection.execute(
                     """SELECT MAX(c.id) FROM checks c JOIN runs r ON r.id = c.run_id
-                    WHERE r.status = 'completed' AND r.finished_at <= ?
+                    WHERE r.status != 'running' AND r.finished_at <= ?
                     GROUP BY c.target ORDER BY c.target""", (now_text,),
                 ).fetchall()
                 latest = tuple(self._read_check(row[0]) for row in latest_ids)
