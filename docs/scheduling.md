@@ -82,6 +82,6 @@ cron 行将 stdout/stderr 追加到指定日志；日志父目录需预先创建
 
 ## 验证范围
 
-步骤 5 使用真实 SQLite 和操作系统 flock，以 HTTPX MockTransport、邮件函数替身及受控 UTC 时钟验证主流程。子进程测试验证已安装入口、真实 uv 启动器、跨工作目录、旧实例终止及接替、强制退出后的锁释放；真实 shell 验证参数引用、日志追加和退出码保留。没有安装系统 crontab，没有连接真实网站或 Gmail；本机 HTTP 服务测试及业务 pytest CI 仍属步骤 6。
+步骤 5 使用真实 SQLite 和操作系统 flock，以 HTTPX MockTransport、邮件函数替身及受控 UTC 时钟验证主流程。子进程测试验证已安装入口、真实 uv 启动器、跨工作目录、旧实例终止及接替、强制退出后的锁释放；真实 shell 验证参数引用、日志追加和退出码保留。没有安装系统 crontab，没有连接真实网站或 Gmail；步骤 6 补充本机 HTTP 服务测试及完整 pytest workflow，见 [统一测试说明](testing.md)，部署维护及可选 Mac 验证见 [部署说明](deployment.md)。
 
 2026-10-18，本机 Python 3.12：按本轮审阅修改后，入口、锁与 cron 相关 74 项测试，全套 `uv run --locked pytest -q` 共 240 项通过。新增覆盖正常终止、忽略 SIGTERM 后强制结束、同一时段保护、身份损坏/PID 重用/不匹配不发信号、无权限、无法确认停止、两个新实例争用，以及旧轮卡在检查或邮件阶段后的真实接替。`/bin/sh -n scripts/run_healthcheck.sh` 通过；sdist/wheel 构建通过，源码归档包含两个辅助脚本，wheel 包含 scheduler 子包。构建规则排除本地 `.vscode/`，归档未包含真实 config.yaml、数据库、锁或日志；开发者的编辑器文件保持原样。

@@ -95,6 +95,6 @@ Report 固定本次 event_ids，同时包含历史失败详情 failed_checks、�
 
 2026-10-18，本机 Python 3.12：`uv run --locked pytest -q` 共 142 项通过，其中任务 3 新增 47 项存储测试。`tests/test_storage.py` 使用 tmp_path 创建真实临时 SQLite 文件，并以独立连接读取提交后的内容，覆盖生命周期、结果和重试记录、唯一约束、重开、事务回滚与参数绑定，以及首次基线、宽限边界、漏跑区间、恢复中断、长任务跳过时段、周期变化、通知快照、间隔与投递状态一致性。
 
-测试没有创建项目 config/var 下的数据库，没有访问 HTTP 或 SMTP。未进行真实 cron/进程锁或邮件联调。现有 Actions 仅检查环境，业务 pytest 在任务 6 接入；以上是任务 3 当时的验证记录，任务 3 现已合并。步骤 5 追加 2 项存储测试，验证显式终止的旧轮只记一次中断、保留已保存的检查时间和明细；当前全套测试为 240 项。
+以上为任务 3 当时的验证记录：没有创建项目 config/var 下的数据库，没有访问 HTTP 或 SMTP，未进行真实 cron/进程锁或邮件联调。任务 3 已合并；步骤 5 追加 2 项存储测试，验证显式终止的旧轮只记一次中断、保留已保存的检查时间和明细，当时全套为 240 项。步骤 6 补充本机 HTTP 与存储的集成，并将 workflow 改为完整 pytest；后续证据见 [统一测试说明](testing.md)，数据库查询和备份见 [部署说明](deployment.md)。
 
 `uv build --out-dir /tmp/canlah-task3-dist` 构建 sdist/wheel 成功；归档检查确认包含 storage 的 schema/models/读写模块，未包含真实 config.yaml 或 SQLite 数据库。本地文档链接及 diff 空白检查通过。

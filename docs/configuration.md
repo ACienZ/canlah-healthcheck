@@ -41,4 +41,4 @@ uv run --locked pytest
 - `uv build --out-dir /tmp/canlah-task1-dist`：sdist 和 wheel 构建成功；归档内容检查未包含真实 config.yaml 或 SQLite 数据库。
 - 测试只读取示例并使用临时配置，覆盖校验边界、路径、异常脱敏和已安装命令从其他目录运行。
 
-以上为任务 1 当时的验证记录；后续模块进度见各模块说明和 [调度验证](scheduling.md)。未进行真实外网 HTTP 或 Gmail 验证。GitHub 现有 workflow 仅检查环境，不能当作 pytest 通过的证据；完整业务 CI 按步骤 6 接入。
+以上为任务 1 当时的验证记录；后续进度见 [调度验证](scheduling.md) 和 [统一测试说明](testing.md)。未进行真实外网 HTTP 或 Gmail 验证。步骤 6 已将 workflow 改为完整 pytest，远端执行结果须在提交推送后核对；安装与维护见 [部署说明](deployment.md)。
