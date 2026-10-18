@@ -60,9 +60,15 @@ Cronie 可用生成片段的 `CRON_TZ=UTC`；不支持它的 Linux cron 需在�
 
 日志追加 stdout/stderr，初版没有内置轮转。请在 Linux 上为所选日志路径配置 logrotate，并设保留天数；历史数据库也不自动清理。具体保留周期在部署前决定，不在初版程序里默默删除记录。
 
+## 测试结束后停用 cron
+
+执行 `crontab -l` 查看任务，再用 `EDITOR=nano crontab -e` 只删除调用本项目 `scripts/run_healthcheck.sh` 的任务行。Ctrl+O、回车保存，Ctrl+X 退出；重新执行 `crontab -l` 确认。不要运行 `crontab -r`，它会删除所有用户任务。
+
+若添加了 `CRON_TZ=UTC`，先确认其他条目不依赖它再删除；该变量可能影响后续任务。删除条目不终止已经启动的进程，只阻止下一轮启动，也不删除配置、数据库或日志。维护前仍须确认现有实例已结束。
+
 ## Mac 的可选真实验证
 
-**用户正准备按流程手动验证，真实 cron、网站与 Gmail 的结果尚未记录；以下是操作说明，不表示验证已经通过。**
+用户于 2026-10-18 确认已完成 Mac 本地真实测试且无问题。以下保留操作说明；该反馈不代表已验证 Linux 生产主机。
 
 Mac 上可先从终端执行同一个 `/bin/sh scripts/run_healthcheck.sh /absolute/uv /absolute/config.yaml`。若以后安装 cron，用 `crontab -e` 保留原条目并追加任务；不要假定 Mac 支持 `CRON_TZ`。本项目周期都是 60 的因数，在当前 JST（UTC+9、无夏令时）下，分钟刻度与 UTC 对齐；其他时区需另行核对。
 
@@ -100,4 +106,4 @@ sqlite3 -readonly -header -column src/canlah_healthcheck/config/var/healthcheck.
 
 独立心跳服务发现整机或 cron 停摆；通过凭证管理替代明文配置；定义告警抑制、升级和收件人策略；落实日志轮转、数据库保留及备份恢复演练；验证实际网站、Gmail、系统 cron 和目标机器权限。专业调度平台、多机协调和数据库迁移需要时另立任务，初版不实现。
 
-发布仍按步骤 7：初版验收、PR 合并且用户明确授权后才推送 `v0.1.0`，由 GitHub Actions 测试通过后创建 Release。本步骤不发版。
+发布流程见 [GitHub Release 说明](releases.md)：初版验收、PR 合并且用户明确授权后才推送 `v0.1.0`，由 GitHub Actions 校验并在测试通过后创建 Release。

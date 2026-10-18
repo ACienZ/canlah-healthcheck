@@ -16,6 +16,7 @@ Canlah Healthcheck 是一个在单台机器上运行的网站健康检查工具�
 - [配置管理](#配置管理)
 - [每五分钟部署运行](#每五分钟部署运行)
 - [测试与持续集成](#测试与持续集成)
+- [版本发布](#版本发布)
 - [数据维护与故障排查](#数据维护与故障排查)
 - [当前边界与生产准备](#当前边界与生产准备)
 
@@ -84,10 +85,11 @@ HTTP 等待超时与上述 5 秒判断分开配置：`request_timeout_seconds` �
 │   └── notifier/notifier.py    # 生成汇总邮件并发送，不直接修改数据库
 ├── scripts/
 │   ├── run_healthcheck.sh      # cron 启动器，设置目录与环境后执行命令
-│   └── print_cron.py           # 根据配置打印 cron 条目，不自动安装
+│   ├── print_cron.py           # 根据配置打印 cron 条目，不自动安装
+│   └── verify_release.py       # 发布前核对标签、包版本和 main 历史
 ├── tests/                     # pytest 单元及集成测试
 ├── docs/                      # 模块、部署、测试及设计的详细说明
-└── .github/workflows/ci.yml    # 完整 pytest 的 CI 配置
+└── .github/workflows/         # ci.yml 运行 pytest，release.yml 验证并发布版本
 ```
 
 | 模块 | 主要接口 | 职责边界 |
@@ -216,6 +218,17 @@ CRON_TZ=UTC
 
 邮件在当前检查全部结束后才处理，不另装一个邮件 cron。首次待通知故障可立即汇总发送；之后发送尝试至少间隔 `mail.interval_minutes`，实际发送仍要等到一次检查结束。SMTP 失败保留待通知事件；成功才标记。没有事件就不发空邮件。
 
+测试结束后，先查看条目，再打开编辑器：
+
+```sh
+crontab -l
+EDITOR=nano crontab -e
+```
+
+只删除调用本项目 `scripts/run_healthcheck.sh` 的完整任务行，保留其他项目的条目。在 Nano 中按 Ctrl+O、回车保存，再按 Ctrl+X 退出。随后执行 `crontab -l`，确认本项目条目已消失；若没有其他条目，提示没有 crontab 也属正常。不要执行 `crontab -r`，它会删除当前用户的全部任务。
+
+若添加过 `CRON_TZ=UTC`，只有确认其他任务不依赖这行时才删除；它可能影响后续任务的时区。删除 cron 条目只会阻止后续启动，已经在执行的实例仍会完成；停用调度不会删除配置、数据库或日志。
+
 ## 测试与持续集成
 
 ```sh
@@ -225,7 +238,13 @@ uv run --locked pytest tests/test_http_integration.py -v
 
 测试使用 pytest fixture、临时目录及 SQLite 隔离数据。单元测试使用 HTTP 和 SMTP 替身；本机 HTTP 集成真实建立回环连接，验证重定向、完整正文耗时、超时及重试；子进程测试验证真实锁、旧实例终止和命令入口。
 
-本项目最近记录的本地完整验证为 254 项通过。GitHub Actions 在 push 和 pull_request 时使用 Ubuntu/Python 3.12 执行 `uv sync --locked` 和 `uv run --locked pytest`；实际结果请查看对应提交的 Actions 或 PR Checks。测试不依赖真实 Canlah 网站或 Gmail，也不读取用户的真实配置。详细范围与证据见 [测试说明](docs/testing.md)。
+本项目最近记录的本地完整验证为 271 项通过。GitHub Actions 在 push 和 pull_request 时使用 Ubuntu/Python 3.12 执行 `uv sync --locked` 和 `uv run --locked pytest`；实际结果请查看对应提交的 Actions 或 PR Checks。测试不依赖真实 Canlah 网站或 Gmail，也不读取用户的真实配置。详细范围与证据见 [测试说明](docs/testing.md)。
+
+## 版本发布
+
+合并发布流程并确认可以发版后，向 GitHub 推送与 `pyproject.toml` 版本一致的标签，例如 `v0.1.0`。Actions 先确认标签提交已经进入 `main`，再安装锁定依赖并运行完整 pytest；全部通过后，才由独立 job 创建 GitHub Release 和自动生成的发布说明。
+
+重复执行会保留已有 Release；版本不匹配、提交未合并、测试失败或查询失败都会阻止创建。使用 GitHub 提供的源码 ZIP/tar.gz，不上传 PyPI，也不额外上传 wheel。发版命令、失败排查及首次发布的授权步骤见 [发布说明](docs/releases.md)。
 
 ## 数据维护与故障排查
 
@@ -254,5 +273,3 @@ SQLite 保存七张表：`runs` 记录每轮状态，`checks` 保存页面最终
 | 数据保留 | 定义检查、尝试、事件及投递历史保留多久，按表关联关系归档或清理，保留未通知故障 | SQLite 初版只增加记录，需要明确磁盘使用和追溯范围 |
 | 备份与恢复演练 | 定期备份 SQLite，把副本恢复到隔离目录，检查完整性并确认可以查询及运行 | 备份文件存在不代表损坏或误删后真的能恢复 |
 | 真实部署验证 | 在目标机器检查网站的 DNS/TLS/正文、Gmail 认证与实际收件、cron 触发和文件权限，并测试停机后的识别 | 本机 HTTP 和 SMTP 替身无法证明真实部署环境可用 |
-
-真实网站、Gmail 和系统 cron 的手动验证由用户执行，结果尚未记录；不将本机集成测试当作真实投递成功。当前任务进度见 [TODO](TODO.md) 和 [GitHub Project](https://github.com/users/ACienZ/projects/12/views/1)。GitHub Release 自动化属于下一项任务，当前尚未发布；首版发布仍须验收、合并并获得用户授权。

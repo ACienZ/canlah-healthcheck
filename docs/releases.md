@@ -1,0 +1,68 @@
+# GitHub Release 发布
+
+初版版本为 `0.1.0`，对应标签 `v0.1.0`。使用 GitHub Actions 和 GitHub Release，不发布到 PyPI；下载内容使用 GitHub 为标签提供的源码 ZIP/tar.gz，不额外上传 wheel 或运行数据。
+
+## 什么时候会发布
+
+`.github/workflows/release.yml` 只在推送 `v*` 标签时运行。普通 commit、分支推送和 PR 合并不会直接发版。`docs:`、`feat:` 等提交前缀用于说明改动，不会自动决定或修改版本号；升级时仍须在独立 PR 中同步 `pyproject.toml` 和 `uv.lock`。
+
+发布分成两项任务：
+
+1. `verify-and-test` 只有仓库读取权限。检出标签并取回完整 Git 历史，用 `scripts/verify_release.py` 确认标签等于 `v` 加包版本、当前检出提交就是标签提交、提交已进入 `origin/main`。然后执行 `uv sync --locked` 和 `uv run --locked pytest`。
+2. `publish` 依赖第一项成功后才启动，并单独取得 `contents: write`。先读取完整 Release 列表；同名 Release 已存在就保留，否则运行 `gh release create --verify-tag --generate-notes`，由 GitHub 根据历史生成发布说明。
+
+main 可能已有更新，所以标签不必指向 main 最新提交，但必须指向它历史中的提交。普通标签和带说明的标签都支持；下面首次发布步骤使用带说明的标签。
+
+任意校验、依赖安装或测试失败都会跳过 `publish`。查询 Release 的网络、认证或权限错误也会停止，不能当成“版本不存在”。同一标签的运行排队，重复执行不覆盖现有说明或资产。workflow 不需要额外配置 PAT 或 Gmail Secrets，使用本次运行的 `GITHUB_TOKEN`；仓库或组织的权限策略仍须允许创建 Release。
+
+权限、任务依赖和标签触发规则见 [GitHub Actions 官方说明](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)；`--verify-tag` 要求标签已经存在，`--generate-notes` 调用 GitHub 自动生成说明，见 [GitHub CLI 文档](https://cli.github.com/manual/gh_release_create)。Release 列表使用 [gh api 的分页功能](https://cli.github.com/manual/gh_api)，避免只检查第一页。
+
+## 首次发布的操作顺序
+
+**只有本步骤 PR 已合并、初版验收完成且用户明确授权发版后，才执行下面的打标签和推送命令。当前实现阶段没有执行这些命令。**
+
+1. 确认工作区没有未提交的项目改动，再切换到 main 并同步：
+
+   ```sh
+   git fetch --prune origin
+   git switch main
+   git pull --ff-only origin main
+   uv sync --locked
+   uv run --locked pytest
+   ```
+
+2. 核对版本与已有标签，确认目标提交就是打算发布的代码。不要移动或覆盖已经发布的标签：
+
+   ```sh
+   uv run --locked python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
+   git log -1 --oneline
+   git tag --list v0.1.0
+   gh release list --repo ACienZ/canlah-healthcheck
+   ```
+
+3. 获得授权后创建标签，先在本地验证，再只推送这个标签：
+
+   ```sh
+   git tag -a v0.1.0 -m "Release v0.1.0"
+   uv run --locked python scripts/verify_release.py v0.1.0
+   git push origin v0.1.0
+   ```
+
+4. 打开仓库 Actions，查看名称为 `Release` 的运行：先确认 `verify-and-test` 完整 pytest 通过，再确认 `publish` 成功。也可以用以下只读命令查看：
+
+   ```sh
+   gh run list --repo ACienZ/canlah-healthcheck --workflow release.yml --limit 5
+   gh release view v0.1.0 --repo ACienZ/canlah-healthcheck
+   ```
+
+5. 打开 Release 页面，检查标签、目标提交、自动生成说明和源码下载链接。自动说明是否完整仍需人工查看，尤其是首次发布；必要时在 GitHub 页面编辑说明，不重打标签。
+
+## 失败和重复执行
+
+- 版本不同：检查标签和 `pyproject.toml`，通过正常 PR 修正；不要为了绕过校验改已发布标签。
+- 提交不在 main：先完成 PR 合并，再按已合并提交准备发布。squash merge 会创建新提交，不能给合并前的功能分支提交打标签。
+- pytest 失败：Release 不会创建。修复后合并，通过正常版本发布流程重新验收，不绕过测试门禁。
+- 网络、依赖下载或 GitHub 权限等临时故障：解决原因后，可以在该次 Actions 页面选择 Re-run failed jobs；若重跑全部任务，会再次运行完整测试。
+- 已有 Release：直接跳过创建，保留原说明和资产，不执行更新或删除命令。已有草稿也按“已存在”处理，需要人工确认其后续状态。
+
+本地 `uv run --locked pytest tests/test_release.py -v` 使用临时 Git 仓库和假 `gh` 验证发布判断及失败停止；不会在本项目打标签或访问 GitHub。完整标签触发、Actions 写权限和 Release 创建，仍以首次获授权推送标签后的实际结果为准。

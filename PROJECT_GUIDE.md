@@ -16,6 +16,7 @@ The [English README](README.md) and [Chinese README](README_CN.md) each stay wit
 - [Configuration](#configuration)
 - [Deployment with a five-minute schedule](#deployment-with-a-five-minute-schedule)
 - [Tests and continuous integration](#tests-and-continuous-integration)
+- [Releases](#releases)
 - [Data maintenance and troubleshooting](#data-maintenance-and-troubleshooting)
 - [Current limitations and production preparation](#current-limitations-and-production-preparation)
 
@@ -84,10 +85,11 @@ The initial implementation uses no message queue. Development takes place on Mac
 │   └── notifier/notifier.py    # Build and send summaries; no direct database updates
 ├── scripts/
 │   ├── run_healthcheck.sh      # cron launcher setting the directory and environment
-│   └── print_cron.py           # Print cron entries from configuration; no installation
+│   ├── print_cron.py           # Print cron entries from configuration; no installation
+│   └── verify_release.py       # Check the tag, package version, and main history before release
 ├── tests/                     # pytest unit and integration tests
 ├── docs/                      # Detailed module, deployment, test, and design documents
-└── .github/workflows/ci.yml    # CI configuration for the complete pytest suite
+└── .github/workflows/         # ci.yml runs pytest; release.yml verifies and publishes versions
 ```
 
 | Module | Main interfaces | Responsibility boundary |
@@ -216,6 +218,17 @@ Cronie supports the `CRON_TZ` line above. For other implementations, confirm sch
 
 Emails are handled only after all current checks finish; no separate mail cron job is installed. The first pending incident can notify immediately after checks finish. Later attempts must be at least `mail.interval_minutes` apart, and actual sending still waits for a completed check round. SMTP failure keeps incidents pending; success marks them notified. No pending incidents means no empty email.
 
+After testing, inspect the entries and open the editor:
+
+```sh
+crontab -l
+EDITOR=nano crontab -e
+```
+
+Delete only the complete task line that calls this project's `scripts/run_healthcheck.sh`, preserving other projects' entries. In Nano, press Ctrl+O and Enter to save, then Ctrl+X to exit. Run `crontab -l` again to confirm that this project's entry is gone; if no entries remain, a message saying there is no crontab is also normal. Do not run `crontab -r`, which deletes all tasks for the current user.
+
+If you added `CRON_TZ=UTC`, remove it only after confirming that other tasks do not depend on it; it may affect the timezone of subsequent entries. Removing a cron entry prevents future starts, while an already running instance continues to completion. Disabling the schedule does not delete configuration, database records, or logs.
+
 ## Tests and continuous integration
 
 ```sh
@@ -225,7 +238,13 @@ uv run --locked pytest tests/test_http_integration.py -v
 
 Tests isolate data using pytest fixtures, temporary directories, and SQLite databases. Unit tests substitute HTTP and SMTP. Local HTTP integration tests establish real loopback connections to verify redirects, full-body timing, timeouts, and retries. Subprocess tests exercise real locks, termination of previous instances, and the installed command.
 
-The latest recorded local full-suite result is 254 passing tests. GitHub Actions runs `uv sync --locked` and `uv run --locked pytest` on Ubuntu/Python 3.12 for pushes and pull requests; verify the actual result for the relevant commit in Actions or PR checks. Tests neither depend on the real Canlah websites or Gmail nor read the user's real configuration. See [test documentation](docs/testing.md) for scope and evidence.
+The latest recorded local full-suite result is 271 passing tests. GitHub Actions runs `uv sync --locked` and `uv run --locked pytest` on Ubuntu/Python 3.12 for pushes and pull requests; verify the actual result for the relevant commit in Actions or PR checks. Tests neither depend on the real Canlah websites or Gmail nor read the user's real configuration. See [test documentation](docs/testing.md) for scope and evidence.
+
+## Releases
+
+Once the release workflow is merged and publishing is authorized, push a tag matching the version in `pyproject.toml`, for example `v0.1.0`, to GitHub. Actions verifies that the tagged commit is already in `main`, installs locked dependencies, and runs the complete pytest suite. Only after these steps pass does a separate job create a GitHub Release with generated release notes.
+
+Reruns preserve an existing Release. Version mismatches, unmerged commits, failed tests, or failed release queries prevent creation. Releases use GitHub's source ZIP/tar.gz archives; nothing is published to PyPI and no extra wheel is uploaded. See the [release guide](docs/releases.md) for commands, troubleshooting, and authorization before the first release.
 
 ## Data maintenance and troubleshooting
 
@@ -254,5 +273,3 @@ These production preparations are future recommendations; the initial implementa
 | Data retention | Define how long checks, attempts, events, and delivery history are kept; archive or clean up with table relationships in mind, preserving unnotified incidents | The initial SQLite database only grows; disk use and the investigation window need explicit policies |
 | Backup and restore drills | Back up SQLite regularly, restore a copy to an isolated directory, check integrity, and verify that it can be queried and used | The existence of a backup file alone does not prove recovery will work after corruption or deletion |
 | Real deployment validation | On the target host, check website DNS/TLS/content, Gmail authentication and actual receipt, cron triggers and file permissions, and detection after downtime | Local HTTP and SMTP substitutes cannot prove that the real deployment works |
-
-The user is carrying out manual website, Gmail, and system-cron validation; results have not yet been recorded. Local integration tests are not evidence of real mail delivery. See [TODO](TODO.md) and the [GitHub Project](https://github.com/users/ACienZ/projects/12/views/1) for task progress. GitHub Release automation belongs to the next task and no release has been published. The first release still requires acceptance, merging, and explicit user authorization.
