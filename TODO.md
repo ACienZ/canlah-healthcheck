@@ -1,10 +1,10 @@
 # Canlah Healthcheck TODO
 
-更新日期：2026-10-18。当前进行步骤 6：集成验证、CI 与说明文档。
+更新日期：2026-10-18。当前进行步骤 7：首次发布自动化。
 
 - Project：[Canlah_healthcheck Tracker](https://github.com/users/ACienZ/projects/12/views/1)。
-- 当前 Issue：[步骤 6 #10](https://github.com/ACienZ/canlah-healthcheck/issues/10)。
-- 当前分支：`codex/10-integration-ci-docs`。
+- 当前 Issue：[步骤 7 #11](https://github.com/ACienZ/canlah-healthcheck/issues/11)。
+- 当前分支：`codex/11-release-automation`。
 - 设计：[实施设计与接口](docs/planning/implementation-plan.md)。
 - 保留 [Issue #3：注意git流程](https://github.com/ACienZ/canlah-healthcheck/issues/3) 及其现有状态、标签。
 
@@ -17,7 +17,7 @@
 
 ## 任务顺序
 
-各任务统一 P1。步骤 0–5 已 Done，步骤 6 为 In progress，步骤 7 为 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
+各任务统一 P1。步骤 0–6 已 Done，步骤 7 为 In progress。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
 
 | 步骤 | Issue | 状态 | Size |
 | --- | --- | --- | --- |
@@ -27,8 +27,8 @@
 | 3 | [SQLite 执行与结果记录](https://github.com/ACienZ/canlah-healthcheck/issues/7) | Done | M |
 | 4 | [Gmail SMTP 汇总告警](https://github.com/ACienZ/canlah-healthcheck/issues/8) | Done | M |
 | 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | Done | M |
-| 6 | [集成验证、CI 与说明文档](https://github.com/ACienZ/canlah-healthcheck/issues/10) | In progress | M |
-| 7 | [首次发布自动化](https://github.com/ACienZ/canlah-healthcheck/issues/11) | TODO | M |
+| 6 | [集成验证、CI 与说明文档](https://github.com/ACienZ/canlah-healthcheck/issues/10) | Done | M |
+| 7 | [首次发布自动化](https://github.com/ACienZ/canlah-healthcheck/issues/11) | In progress | M |
 
 ## 步骤 0 验收记录
 
@@ -112,7 +112,7 @@
 - [x] 用户已审阅实现，授权提交、推送并创建 PR；提交包含 Codex 共同作者署名。
 - [x] 用户已合并 PR #17，Issue #9 已关闭，Project 为 Done；合并提交为 41b46ea。
 
-## 当前子任务：步骤 6
+## 步骤 6 验收记录
 
 - [x] 核对 PR #17 已合并，Project 中 Issue #10 已调整为 In progress。
 - [x] 从最新 main 创建并关联 codex/10-integration-ci-docs，本地跟踪对应远端，基线为 41b46ea。
@@ -126,12 +126,25 @@
 - [x] 全套 254 项 pytest、shell 语法、README 行数、文档链接、CI YAML 及部署 SQL 检查通过；sdist/wheel 构建与内容排除检查通过。
 - [x] 已暂存本任务文件并检查完整 diff（含新增文件），记录验证证据；未纳入用户的 .vscode/，保留用户最新 README 布局。
 - [x] 用户已审阅实现及文档，授权提交、推送并创建 PR；提交包含 Codex 共同作者署名。
-- [ ] 用户合并 PR、关闭 Issue 并删除分支；合并后再进入步骤 7。
+- [x] 用户已合并 PR #18、关闭 Issue #10 并删除远端分支；Project 为 Done，合并提交 dfed3db。
+
+## 当前子任务：步骤 7
+
+- [x] 核对 PR #18 已合并、Issue #10 已关闭；将 Project 中 Issue #11 设为 In progress。
+- [x] 从最新 main（dfed3db）创建并关联 codex/11-release-automation，本地已切换并跟踪远端同名分支。
+- [x] 实现 v* 标签发布流程：版本一致、标签提交已进入 main、完整 pytest 通过，才能创建 GitHub Release。
+- [x] 验证已有 Release 不覆盖，查询/测试失败时不发布；不上传 PyPI 或额外构建资产。
+- [x] 补充发布说明，同步双语指南的 cron 删除步骤，删除末尾过时备注。
+- [x] 用户反馈 Mac 本地真实测试已完成且无问题；记录为用户确认，不编造执行日志或逐项测试数据。
+- [x] 发布专项 17 项、完整 pytest 271 项通过；sdist/wheel 构建通过，源码包含发布脚本与文档。
+- [x] 已检查完整暂存 diff（含新增文件）、114 处本地文档链接、双语命令、README 行数、发布 shell 语法及归档内容；未纳入 .vscode/。
+- [x] 用户已审阅实现及发布步骤，授权 commit、推送与创建 PR；提交包含 Codex 共同作者署名。
+- [ ] 用户审阅合并 PR、关闭 Issue 并删除分支；首次发布另在合并后授权推送标签。
 
 ## 实施边界
 
-步骤 1–5 已合并，历史验收记录见 [配置说明](docs/configuration.md)、[检查说明](docs/checker.md)、[存储说明](docs/storage.md)、[邮件说明](docs/notifier.md) 和 [命令与调度说明](docs/scheduling.md)。
+步骤 1–6 已合并，历史验收记录见 [配置说明](docs/configuration.md)、[检查说明](docs/checker.md)、[存储说明](docs/storage.md)、[邮件说明](docs/notifier.md) 和 [命令与调度说明](docs/scheduling.md)。
 
-步骤 6 补充本机 HTTP 集成测试、业务 pytest CI 和使用说明。真实网站、Gmail 和系统 cron 由用户手动验证，结果尚未记录；本步骤的自动测试不安装系统定时任务、不读取真实配置或发送真实邮件。步骤 7 的发布自动化暂不实施。
+步骤 6 补充本机 HTTP 集成测试、业务 pytest CI 和使用说明。用户已确认 Mac 本地真实测试通过；本步骤的自动测试不安装系统定时任务、不读取真实配置或发送真实邮件。步骤 7 在当前分支实现发布自动化，首版标签仍须合并并获得用户授权后再推送。
 
-环境复现：`uv sync --locked`。统一测试命令：`uv run --locked pytest`，最近记录的本地全套 254 项通过。本次审阅调整仅修改文档，未重复运行业务测试；文档入口见 [中文说明](PROJECT_GUIDE_CN.md) / [English guide](PROJECT_GUIDE.md)，详见 [部署维护](docs/deployment.md) 和 [测试证据](docs/testing.md)；[英文 README](README.md) 与 [中文 README](README_CN.md) 各 10 行。
+环境复现：`uv sync --locked`。统一测试命令：`uv run --locked pytest`，本地完整验证为 271 项通过（10.74 秒）；新增 17 项发布测试，仅使用临时 Git 仓库和假 gh，未实际推送标签或发布。文档入口见 [中文说明](PROJECT_GUIDE_CN.md) / [English guide](PROJECT_GUIDE.md)，详见 [部署维护](docs/deployment.md) 和 [测试证据](docs/testing.md)；[英文 README](README.md) 与 [中文 README](README_CN.md) 各 10 行。

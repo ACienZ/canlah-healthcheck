@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 同一标签的重复运行排队，防止两个实例同时创建同一个 Release。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      NO_PROXY: 127.0.0.1,localhost,::1
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 校验 main 的提交历史，不能只取标签当前的一层代码。
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.28"
+      - name: Install Python
+        run: uv python install
+      - name: Verify release tag
+        run: uv run --no-project --python 3.12 python scripts/verify_release.py "$RELEASE_TAG"
+      - name: Install locked dependencies
+        run: uv sync --locked
+      - name: Run all tests
+        # 与普通 CI 相同的完整测试；不读取真实配置或连接真实 Gmail。
+        run: uv run --locked pytest
+
+  publish:
+    # 上一项校验或 pytest 任意失败，这个有写权限的 job 都不会启动。
+    needs: verify-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Create release unless already present
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 先成功读取完整列表，再判断是否存在；网络或权限错误不能当成“不存在”。
+          existing_tags=$(gh api --paginate "repos/$GH_REPO/releases" --jq '.[].tag_name')
+          if grep -Fxq -- "$RELEASE_TAG" <<< "$existing_tags"; then
+            echo "Release $RELEASE_TAG 已存在，保留原说明和资产。"
+          else
+            # 只使用已推送标签和 GitHub 自动生成的源码归档，不构建或上传 PyPI。
+            gh release create "$RELEASE_TAG" --repo "$GH_REPO" --verify-tag --generate-notes
+          fi

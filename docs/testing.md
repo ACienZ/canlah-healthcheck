@@ -27,6 +27,7 @@ pytest 按文件名 `test_*.py` 和函数名 `test_*` 查找测试；每个 `ass
 | tests/test_main.py | 临时配置、真实 SQLite/flock、HTTP/SMTP 替身；整轮次序、状态、退出码与旧任务处理 |
 | tests/test_process_lock.py | 真实子进程和文件锁；SIGTERM、SIGKILL、同一时段保护、进程身份校验及接替 |
 | tests/test_cron.py | 真实 shell、生成后的命令、uv 启动器；路径引用、日志追加、跨目录及退出码，不安装 crontab |
+| tests/test_release.py | 临时 Git 仓库验证版本与合并状态；读取实际 workflow，执行其中的发布 shell，使用假 gh 验证重复跳过及失败停止 |
 | tests/test_http_integration.py | 本机 HTTP 服务器、真实 HTTPX 连接；重定向、分段正文、读取超时、连接失败、重试、命令和通知状态配合 |
 
 单元测试将时间变为确定数字，用于严格验证阈值和重试等待；本机 HTTP 测试真正传输数据、等待延迟，不替换 HTTP 的计时。两者互补，不能拿模拟出来的超时作为真实网络验证证据。
@@ -50,9 +51,9 @@ pytest 按文件名 `test_*.py` 和函数名 `test_*` 查找测试；每个 `ass
 
 workflow 使用只读仓库权限和十分钟超时，不配置 Gmail Secrets，不执行健康检查命令或安装系统 cron。测试使用自己的临时配置和 SMTP 替身；依赖安装需要网络，但业务测试不依赖外网网站或真实 Gmail。uv 用法参考 [官方 Actions 集成文档](https://docs.astral.sh/uv/guides/integration/github/)。
 
-本地 pytest 成功不能当作 Linux Actions 已通过；请核对本步骤 PR Checks 或对应提交的实际运行结果。发布 workflow 在步骤 7 单独实施。
+本地 pytest 成功不能当作 Linux Actions 已通过；请核对本步骤 PR Checks 或对应提交的实际运行结果。步骤 7 的发布 workflow 单独在标签推送时重新运行完整测试，通过后才允许创建 Release，详见 [发布说明](releases.md)。
 
-## 本次验证记录
+## 步骤 6 验证记录
 
 环境为 2026-10-18 的 Mac、Python 3.12、uv 0.9.28。步骤 5 的基线为 240 项；步骤 6 新增 14 项本机 HTTP 集成用例。
 
@@ -68,11 +69,25 @@ workflow 使用只读仓库权限和十分钟超时，不配置 Gmail Secrets，
 
 初次完整测试发现本机不可用端口返回等待超时，测试原先只接受立即拒绝连接；已按操作系统差异调整连接失败断言并缩短等待。没有为此修改业务代码，也没有改变 `timeout` 与 `network` 的分类规则。
 
-真实服务范围：用户正按流程准备手动验证 canlah.ai、Gmail 账户与系统 cron，结果尚未记录。本机 HTTP 集成成功不验证公网 DNS、TLS、实际站点正文、Gmail 认证/收件箱、cron 权限或机器睡眠后的行为。
+真实服务反馈：用户于 2026-10-18 确认 Mac 本地真实测试已经完成且无问题。本记录基于用户反馈，未收集逐项命令、执行时间和日志；不推断覆盖了停机、休眠等全部异常场景，也不代表 Linux 部署主机已完成验证。本机 HTTP 自动测试与该手动测试是两类证据。
 
-## 后续真实验证与已知边界
+## 步骤 7 验证记录
 
-用户决定开始真实验证后，按 [部署说明](deployment.md) 使用自己的配置先手动运行，再安装 cron，记录执行时间、命令、退出码、数据库变化和邮件是否收到。可临时把真实配置中的关键词换为一个确定不存在的值制造故障；验证后必须恢复 `Canlah`。不要为了测试删除历史库或放宽 TLS 校验。
+2026-10-18，Mac / Python 3.12.12 / uv 0.9.28：
+
+- `uv run --locked pytest tests/test_release.py -q`：17 项通过，4.03 秒。
+- `uv run --locked pytest`：271 项通过，10.74 秒；包含原有 254 项和新增发布测试。
+- 临时 Git 仓库实际验证普通/带说明标签、main 后续前进、版本不符、未合并、错误检出、缺少 main 历史和 CLI 退出码；没有给本项目打标签。
+- 从实际 release.yml 读取发布 bash 并执行，假 gh 验证不存在时创建、已有时跳过、标签精确匹配、查询失败停止和创建失败返回非零；workflow 结构检查确认测试任务先于有写权限的发布任务。
+- `uv build --out-dir /tmp/canlah-task7-dist`：sdist 与 wheel 构建通过；归档检查确认源码含发布脚本、workflow、测试与文档，源码及 wheel 均排除真实配置、数据库、锁、日志和 .vscode/。
+- 114 处本地 Markdown 文件/章节链接、双语命令一致性、两份 README 各 10 行、发布 bash 语法与完整暂存 diff 检查通过。
+- 真实 `gh api --paginate` 只读查询成功，仓库当前没有 Release；没有执行真实创建命令。
+
+本地验证不等于标签 workflow 已在 GitHub 执行；PR 推送后的普通 CI 与首次获授权打标签后的 Release 运行分别核对，不为验证 workflow 提前发布。
+
+## 真实验证方法与已知边界
+
+在其他部署机器复验时，按 [部署说明](deployment.md) 使用自己的配置先手动运行，再安装 cron，记录执行时间、命令、退出码、数据库变化和邮件是否收到。可临时把真实配置中的关键词换为一个确定不存在的值制造故障；验证后必须恢复 `Canlah`。不要为了测试删除历史库或放宽 TLS 校验。
 
 | 场景 | 当前行为与后续验收重点 |
 | --- | --- |

@@ -1,6 +1,6 @@
 # Canlah Healthcheck 实施设计
 
-设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–5 已合并（步骤 5 为 PR #17，41b46ea）；步骤 6 在 codex/10-integration-ci-docs 完成本地验收，用户已审阅并授权提交，待 PR 合并。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md)、[汇总邮件](../notifier.md) 和 [命令调度](../scheduling.md)；统一使用与验收见 [部署说明](../deployment.md) 和 [测试说明](../testing.md)。
+设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–6 已合并（步骤 6 为 PR #18，dfed3db）；步骤 7 在 codex/11-release-automation 完成实现及本地验收，用户已审阅并授权提交，待 PR 合并；尚未推送版本标签或发布。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md)、[汇总邮件](../notifier.md) 和 [命令调度](../scheduling.md)；统一使用与验收见 [部署说明](../deployment.md) 和 [测试说明](../testing.md)。
 
 ## 1. 目标、范围与技术选型
 
@@ -132,9 +132,9 @@ Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HT
 
 步骤 5 重写入口测试并新增锁与 cron 测试；本轮审阅新增 psutil 及终止旧实例策略后，相关 74 项、本地全套 240 项通过。真实 SQLite/flock 配合 HTTP、SMTP 和时钟替身验证主流程；子进程和 shell 验证跨目录、互斥、终止与强制结束后接替、进程身份保护、邮件阶段中断保留结果、日志和退出码。sdist/wheel 及运行数据排除检查通过；未安装系统 cron 或连接真实外部服务。详见 [命令与调度说明](../scheduling.md)。
 
-步骤 6 新增 tests/test_http_integration.py：本机回环 HTTP 服务验证重定向、完整正文耗时、实际读取超时、连接失败、协议错误和重试；主流程配合真实 SQLite、邮件生成及 SMTP 替身，验证通知失败保留和恢复后汇总。CI 的 Ubuntu job 使用 Python 3.12、uv 0.9.28、uv sync --locked 和 uv run --locked pytest，无 Gmail Secrets。补充 10 行英文 README、双语项目说明、部署维护与测试说明；真实网站、Gmail 和系统 cron 由用户手动验证，结果待记录，不把本地测试表述为真实服务已验收。
+步骤 6 新增 tests/test_http_integration.py：本机回环 HTTP 服务验证重定向、完整正文耗时、实际读取超时、连接失败、协议错误和重试；主流程配合真实 SQLite、邮件生成及 SMTP 替身，验证通知失败保留和恢复后汇总。CI 的 Ubuntu job 使用 Python 3.12、uv 0.9.28、uv sync --locked 和 uv run --locked pytest，无 Gmail Secrets。补充 10 行英文 README、双语项目说明、部署维护与测试说明；用户于 2026-10-18 确认 Mac 本地真实测试通过；该结果单独记录为用户反馈，不代表 Linux 生产主机已验收。
 
-步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。本轮不创建 release workflow 或 Release。
+步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。当前步骤已实现 release workflow 与发布前校验脚本，详细操作见 [发布说明](../releases.md)；尚未实际创建 Release。
 
 README 保持 5–10 行，集中回答每五分钟运行、故障告警和生产前补充；链接根目录 [PROJECT_GUIDE.md 英文版](../../PROJECT_GUIDE.md) 和 [PROJECT_GUIDE_CN.md 中文版](../../PROJECT_GUIDE_CN.md)，介绍功能、技术栈、模块、运行逻辑、安装配置和部署，并逐项解释生产准备建议。详细 cron、Gmail 配置、SQLite 维护及验证证据继续由 docs/ 文档维护。升级方案包括独立心跳监控、专业调度平台、告警抑制/升级策略、凭证管理和数据保留策略。
 
