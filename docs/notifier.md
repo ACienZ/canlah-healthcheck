@@ -39,4 +39,4 @@ SMTP 接收后、数据库提交前崩溃，或邮件已被接受但关闭连接
 
 `uv run --locked pytest tests/test_notifier.py -q`：19 项离线测试通过。覆盖中文 MIME 往返解析、TLS 校验设置、配置参数、汇总内容、未知响应数据、空报告、连接/认证/发送/关闭失败、部分/全部拒收、凭证脱敏，以及临时 SQLite 中的间隔、恢复后历史故障、成功标记和快照边界。
 
-全套 `uv run --locked pytest`：161 项通过。没有连接真实 Gmail 或网站；以上为步骤 4 当时的验证范围；步骤 5 已整合入口及真实进程锁测试，尚未安装系统 cron；现有 Actions 仍仅检查环境，业务 pytest CI 在步骤 6 接入。
+全套 `uv run --locked pytest`：161 项通过。以上为步骤 4 当时的验证范围。步骤 5 已整合入口及真实进程锁；步骤 6 补充本机 HTTP 配合真实邮件组装、SQLite 和 SMTP 替身，并将 workflow 改为完整 pytest，见 [统一测试说明](testing.md)。尚未安装系统 cron、连接真实 Gmail 或网站；远端 CI 结果须在提交推送后核对。

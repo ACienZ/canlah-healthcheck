@@ -1,6 +1,6 @@
 # Canlah Healthcheck 实施设计
 
-设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–4 已合并；步骤 5 的命令流程、进程锁与 cron 辅助脚本已实现，已完成本地验收，用户已审阅实现，待 PR 合并。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md) 和 [汇总邮件](../notifier.md)。
+设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–5 已合并（步骤 5 为 PR #17，41b46ea）；步骤 6 在 codex/10-integration-ci-docs 完成本地验收，用户已审阅并授权提交，待 PR 合并。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md)、[汇总邮件](../notifier.md) 和 [命令调度](../scheduling.md)；统一使用与验收见 [部署说明](../deployment.md) 和 [测试说明](../testing.md)。
 
 ## 1. 目标、范围与技术选型
 
@@ -16,8 +16,8 @@
 | HTTP | HTTPX 同步 Client；两个页面顺序执行，复用连接，便于 MockTransport 测试 | 步骤 2 已合并 |
 | 存储 | 标准库 sqlite3，事务管理，不引入 ORM | 步骤 3 已合并；步骤 5 已接入实际进程锁 |
 | 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 步骤 4 已合并；真实投递另行验证 |
-| 调度 | cron + shell 启动脚本；fcntl.flock 文件锁 + psutil 核对并终止旧实例（Linux/Mac） | 步骤 5 已实现并经用户审阅，待 PR 合并 |
-| 测试 | pytest，uv dev 依赖；fixture、tmp_path、monkeypatch | 每步同步添加 |
+| 调度 | cron + shell 启动脚本；fcntl.flock 文件锁 + psutil 核对并终止旧实例（Linux/Mac） | 步骤 5 已合并 |
+| 测试 | pytest，uv dev 依赖；fixture、tmp_path、monkeypatch；本机 HTTP 服务 | 步骤 6 补充集成测试和完整 pytest CI |
 | 发布 | GitHub Actions 标签触发；GitHub Release 源码归档，不发布 PyPI | 待步骤 7 |
 
 HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是整个响应的总时限。完整响应耗时用 monotonic/perf_counter 测量，包含重定向与响应体读取，不包含重试等待。不能把 HTTPX timeout 参数等同于 5 秒验收阈值；持续缓慢传输可能延长一轮执行，完整流程不承诺严格总运行时限；下一时段启动时按本轮确认的策略终止未结束的旧实例，再执行当前轮。
@@ -112,7 +112,7 @@ CLI 退出码：0=本轮健康且没有执行错误；1=至少一个目标重试
 
 ## 5. pytest 验收与发布
 
-统一使用 uv run --locked pytest。pytest 属于 dev 依赖；每个实现任务同步添加测试。fixture、tmp_path、临时 SQLite 和 monkeypatch 隔离环境；HTTPX MockTransport 替换 HTTP，SMTP 与 sleep/时钟使用替身，不在 CI 真实发信或请求外网。
+统一使用 uv run --locked pytest。pytest 属于 dev 依赖；每个实现任务同步添加测试。fixture、tmp_path、临时 SQLite 和 monkeypatch 隔离环境；单元测试使用 HTTPX MockTransport 及 sleep/时钟替身，本机 HTTP 集成使用真实连接、计时和延迟；SMTP 使用替身，不在 CI 真实发信或请求外网站点。
 
 | 范围 | 必测场景 |
 | --- | --- |
@@ -124,7 +124,7 @@ CLI 退出码：0=本轮健康且没有执行错误；1=至少一个目标重试
 | 集成 | 本机 HTTP 服务验证响应和延迟；子进程 CLI 退出码、不同工作目录、锁互斥、全流程与 cron 行生成 |
 | 发布 | CI 不连接真实服务；版本与标签匹配，测试失败阻断发布，重复发布不覆盖已有资产 |
 
-Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HTTP 和 Gmail 冒烟验证需独立执行并记录时间、命令、范围及结果，不把 mock 成功当成真实集成成功。步骤 1 已有 59 项配置和入口测试；步骤 2 新增 36 项离线检查测试，本地合计 95 项 pytest 通过。HTTPX MockTransport 与可控时钟验证请求处理、完整正文及重定向耗时、边界和重试；超时异常由测试模拟，不代表真实网络超时验证。现有 CI 仍仅检查环境，业务 pytest 接入及本机 HTTP 集成按步骤 6 实施。
+Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HTTP 和 Gmail 冒烟验证需独立执行并记录时间、命令、范围及结果，不把 mock 成功当成真实集成成功。步骤 1 已有 59 项配置和入口测试；步骤 2 新增 36 项离线检查测试，本地合计 95 项 pytest 通过。HTTPX MockTransport 与可控时钟验证请求处理、完整正文及重定向耗时、边界和重试；当时超时异常由测试模拟，不代表真实网络超时验证。步骤 6 已补充本机 HTTP 连接并将 workflow 改为完整 pytest，远端执行结果须在提交推送后核对。
 
 步骤 3 新增 47 项真实临时 SQLite 测试，本地合计 142 项通过，覆盖生命周期、结果及重试历史、唯一约束、重开、首次基线、漏跑区间、宽限边界、中断、长任务重叠导致的跳过、周期变化，以及通知间隔/快照/成功标记/失败保留。通过触发器故意中断写入，验证结果保存、恢复游标及通知状态的事务回滚。未运行真实 HTTP、SMTP 或 cron 集成。
 
@@ -132,9 +132,11 @@ Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HT
 
 步骤 5 重写入口测试并新增锁与 cron 测试；本轮审阅新增 psutil 及终止旧实例策略后，相关 74 项、本地全套 240 项通过。真实 SQLite/flock 配合 HTTP、SMTP 和时钟替身验证主流程；子进程和 shell 验证跨目录、互斥、终止与强制结束后接替、进程身份保护、邮件阶段中断保留结果、日志和退出码。sdist/wheel 及运行数据排除检查通过；未安装系统 cron 或连接真实外部服务。详见 [命令与调度说明](../scheduling.md)。
 
+步骤 6 新增 tests/test_http_integration.py：本机回环 HTTP 服务验证重定向、完整正文耗时、实际读取超时、连接失败、协议错误和重试；主流程配合真实 SQLite、邮件生成及 SMTP 替身，验证通知失败保留和恢复后汇总。CI 的 Ubuntu job 使用 Python 3.12、uv 0.9.28、uv sync --locked 和 uv run --locked pytest，无 Gmail Secrets。补充 10 行英文 README、双语项目说明、部署维护与测试说明；真实网站、Gmail 和系统 cron 由用户手动验证，结果待记录，不把本地测试表述为真实服务已验收。
+
 步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。本轮不创建 release workflow 或 Release。
 
-README 保持 5–10 行；详细安装、cron、Gmail 配置、SQLite 维护、验证证据和升级方案另放使用文档。升级方案包括独立心跳监控、专业调度平台、告警抑制/升级策略、凭证管理和数据保留策略。
+README 保持 5–10 行，集中回答每五分钟运行、故障告警和生产前补充；链接根目录 [PROJECT_GUIDE.md 英文版](../../PROJECT_GUIDE.md) 和 [PROJECT_GUIDE_CN.md 中文版](../../PROJECT_GUIDE_CN.md)，介绍功能、技术栈、模块、运行逻辑、安装配置和部署，并逐项解释生产准备建议。详细 cron、Gmail 配置、SQLite 维护及验证证据继续由 docs/ 文档维护。升级方案包括独立心跳监控、专业调度平台、告警抑制/升级策略、凭证管理和数据保留策略。
 
 ## 6. 实施顺序与审阅
 

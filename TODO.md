@@ -1,10 +1,10 @@
 # Canlah Healthcheck TODO
 
-更新日期：2026-10-18。当前进行步骤 5：命令入口与 cron 调度。
+更新日期：2026-10-18。当前进行步骤 6：集成验证、CI 与说明文档。
 
 - Project：[Canlah_healthcheck Tracker](https://github.com/users/ACienZ/projects/12/views/1)。
-- 当前 Issue：[步骤 5 #9](https://github.com/ACienZ/canlah-healthcheck/issues/9)。
-- 当前分支：`codex/9-cli-cron`。
+- 当前 Issue：[步骤 6 #10](https://github.com/ACienZ/canlah-healthcheck/issues/10)。
+- 当前分支：`codex/10-integration-ci-docs`。
 - 设计：[实施设计与接口](docs/planning/implementation-plan.md)。
 - 保留 [Issue #3：注意git流程](https://github.com/ACienZ/canlah-healthcheck/issues/3) 及其现有状态、标签。
 
@@ -17,7 +17,7 @@
 
 ## 任务顺序
 
-各任务统一 P1。步骤 0–4 已 Done，步骤 5 为 In progress，其余 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
+各任务统一 P1。步骤 0–5 已 Done，步骤 6 为 In progress，步骤 7 为 TODO。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
 
 | 步骤 | Issue | 状态 | Size |
 | --- | --- | --- | --- |
@@ -26,8 +26,8 @@
 | 2 | [页面检查与重试](https://github.com/ACienZ/canlah-healthcheck/issues/6) | Done | M |
 | 3 | [SQLite 执行与结果记录](https://github.com/ACienZ/canlah-healthcheck/issues/7) | Done | M |
 | 4 | [Gmail SMTP 汇总告警](https://github.com/ACienZ/canlah-healthcheck/issues/8) | Done | M |
-| 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | In progress | M |
-| 6 | [集成验证、CI 与说明文档](https://github.com/ACienZ/canlah-healthcheck/issues/10) | TODO | M |
+| 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | Done | M |
+| 6 | [集成验证、CI 与说明文档](https://github.com/ACienZ/canlah-healthcheck/issues/10) | In progress | M |
 | 7 | [首次发布自动化](https://github.com/ACienZ/canlah-healthcheck/issues/11) | TODO | M |
 
 ## 步骤 0 验收记录
@@ -95,7 +95,7 @@
 - [x] 用户已审阅实现，并授权提交、推送和创建 PR；提交包含 Codex 共同作者署名。
 - [x] 用户已合并 PR #16，Issue #8 已关闭、远端分支已删除，Project 为 Done；合并提交为 c6d70e3。
 
-## 当前子任务：步骤 5
+## 步骤 5 验收记录
 
 - [x] 核对 PR #16 已合并、Issue #8 已关闭；将 Project 中 Issue #9 调整为 In progress。
 - [x] 从最新 main 创建并关联 codex/9-cli-cron，本地跟踪对应远端，基线为 c6d70e3。
@@ -110,12 +110,28 @@
 - [x] 已把 reconcile_schedule 的职责和五段逻辑改为白话说明，说明“补上数据库状态”不表示重新执行旧任务。
 - [x] 只加载用户现有真实配置，字段校验通过；没有请求网站、连接 SMTP 或输出配置内容。
 - [x] 用户已审阅实现，授权提交、推送并创建 PR；提交包含 Codex 共同作者署名。
-- [ ] 用户合并 PR、关闭 Issue 并删除分支；合并后再进入步骤 6。
+- [x] 用户已合并 PR #17，Issue #9 已关闭，Project 为 Done；合并提交为 41b46ea。
+
+## 当前子任务：步骤 6
+
+- [x] 核对 PR #17 已合并，Project 中 Issue #10 已调整为 In progress。
+- [x] 从最新 main 创建并关联 codex/10-integration-ci-docs，本地跟踪对应远端，基线为 41b46ea。
+- [x] 新增 14 项本机 HTTP 集成用例，覆盖真实连接、重定向、完整正文耗时、读取超时、连接/协议失败与重试。
+- [x] 将本机 HTTP、SQLite、邮件替身与命令入口串联，验证保存、通知状态、恢复后历史汇总和跨目录已安装命令。
+- [x] GitHub Actions 从环境检查改为 Python 3.12 完整 pytest；实际远端结果以本步骤 PR Checks 为准。
+- [x] 提供符合 5–10 行要求的英文 README、中文部署维护及 pytest 说明，同步历史模块文档中的 CI 状态。
+- [x] 按用户审阅整理 PROJECT_GUIDE.md 英文版和 PROJECT_GUIDE_CN.md 中文版，完整介绍功能、模块、运行逻辑、配置、部署及维护，支持语言切换。
+- [x] 审阅用户调整的 README，保留分组结构、修正配置不会自动更新 cron 的表述，控制为 10 行并链接双语指南；逐项解释生产准备建议，未实施这些扩展功能。
+- [x] 再次审阅 README，修正“本轮成功等于没有待通知事件”的歧义；新增 README_CN.md 并加入双向链接，两份均为 10 行。
+- [x] 全套 254 项 pytest、shell 语法、README 行数、文档链接、CI YAML 及部署 SQL 检查通过；sdist/wheel 构建与内容排除检查通过。
+- [x] 已暂存本任务文件并检查完整 diff（含新增文件），记录验证证据；未纳入用户的 .vscode/，保留用户最新 README 布局。
+- [x] 用户已审阅实现及文档，授权提交、推送并创建 PR；提交包含 Codex 共同作者署名。
+- [ ] 用户合并 PR、关闭 Issue 并删除分支；合并后再进入步骤 7。
 
 ## 实施边界
 
-步骤 1–4 已合并，配置、检查、SQLite 和邮件的历史验收记录见 [配置说明](docs/configuration.md)、[检查说明](docs/checker.md)、[存储说明](docs/storage.md) 和 [邮件说明](docs/notifier.md)。
+步骤 1–5 已合并，历史验收记录见 [配置说明](docs/configuration.md)、[检查说明](docs/checker.md)、[存储说明](docs/storage.md)、[邮件说明](docs/notifier.md) 和 [命令与调度说明](docs/scheduling.md)。
 
-步骤 5 已完成本地验收，用户已审阅实现，待 PR 合并；接入完整命令与实际进程锁，新增 cron 启动器及生成辅助脚本；本地验证进度见上方清单及 [命令与调度说明](docs/scheduling.md)。不安装系统定时任务，不发送真实邮件；本机 HTTP 集成与业务 CI 仍在步骤 6。
+步骤 6 补充本机 HTTP 集成测试、业务 pytest CI 和使用说明。真实网站、Gmail 和系统 cron 由用户手动验证，结果尚未记录；本步骤的自动测试不安装系统定时任务、不读取真实配置或发送真实邮件。步骤 7 的发布自动化暂不实施。
 
-环境复现：`uv sync --locked`。统一测试命令：`uv run --locked pytest`。详细部署文档在步骤 6 汇总，题目要求的 README 保持 5–10 行。
+环境复现：`uv sync --locked`。统一测试命令：`uv run --locked pytest`，最近记录的本地全套 254 项通过。本次审阅调整仅修改文档，未重复运行业务测试；文档入口见 [中文说明](PROJECT_GUIDE_CN.md) / [English guide](PROJECT_GUIDE.md)，详见 [部署维护](docs/deployment.md) 和 [测试证据](docs/testing.md)；[英文 README](README.md) 与 [中文 README](README_CN.md) 各 10 行。

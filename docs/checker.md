@@ -47,4 +47,4 @@ uv run --locked pytest -q
 
 `uv build --out-dir /tmp/canlah-task2-dist` 构建 sdist 和 wheel 成功；归档检查确认包含 checker 子包、main.py 和新的命令映射，未包含真实 config.yaml 或数据库。
 
-本次是离线单元验证；超时由替身主动抛出，不验证真实 socket 超时。本机 HTTP 集成测试在步骤 6 实施；此段记录任务 2 当时的范围；SQLite、邮件和入口的后续验证见对应模块文档，真实站点和 Gmail 尚未验证。当前 Actions 仍仅检查环境，完整 pytest 的 CI 接入也在步骤 6。
+以上是任务 2 当时的离线验证；超时由替身主动抛出。步骤 6 另加本机 HTTP 集成测试，实际验证 socket、重定向、正文延迟和超时，并将 CI 改为完整 pytest，见 [统一测试说明](testing.md)。真实站点和 Gmail 尚未验证；远端 workflow 结果须在提交推送后核对。
