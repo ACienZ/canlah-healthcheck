@@ -2,6 +2,8 @@
 name = "canlah-healthcheck"
 version = "0.1.0"
 description = "Canlah website healthcheck exercise"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28,<0.29",

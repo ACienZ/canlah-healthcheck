@@ -1,6 +1,6 @@
 # Canlah Healthcheck 实施设计
 
-设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–6 已合并（步骤 6 为 PR #18，dfed3db）；步骤 7 在 codex/11-release-automation 完成实现及本地验收，用户已审阅并授权提交，待 PR 合并；尚未推送版本标签或发布。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md)、[汇总邮件](../notifier.md) 和 [命令调度](../scheduling.md)；统一使用与验收见 [部署说明](../deployment.md) 和 [测试说明](../testing.md)。
+设计日期：2026-10-17；更新日期：2026-10-18。状态：步骤 0–7 已全部合并，步骤 7 为 PR #19（76ada0b），Issue #11 已关闭、Project 为 Done；[v0.1.0](https://github.com/ACienZ/canlah-healthcheck/releases/tag/v0.1.0) 已通过完整测试门禁并正式发布。模块说明见 [配置模块](../configuration.md)、[页面检查](../checker.md)、[SQLite 存储](../storage.md)、[汇总邮件](../notifier.md) 和 [命令调度](../scheduling.md)；统一使用与验收见 [部署说明](../deployment.md)、[测试说明](../testing.md) 和 [发布记录](../releases.md#v010-正式发布记录)。
 
 ## 1. 目标、范围与技术选型
 
@@ -18,7 +18,7 @@
 | 邮件 | 标准库 smtplib、email；Gmail SMTP_SSL，465 端口，启用证书校验 | 步骤 4 已合并；真实投递另行验证 |
 | 调度 | cron + shell 启动脚本；fcntl.flock 文件锁 + psutil 核对并终止旧实例（Linux/Mac） | 步骤 5 已合并 |
 | 测试 | pytest，uv dev 依赖；fixture、tmp_path、monkeypatch；本机 HTTP 服务 | 步骤 6 补充集成测试和完整 pytest CI |
-| 发布 | GitHub Actions 标签触发；GitHub Release 源码归档，不发布 PyPI | 待步骤 7 |
+| 发布 | GitHub Actions 标签触发；GitHub Release 源码归档，不发布 PyPI | 步骤 7 已合并，v0.1.0 已发布 |
 
 HTTPX 的网络超时是连接/读/写/连接池阶段的等待上限，不是整个响应的总时限。完整响应耗时用 monotonic/perf_counter 测量，包含重定向与响应体读取，不包含重试等待。不能把 HTTPX timeout 参数等同于 5 秒验收阈值；持续缓慢传输可能延长一轮执行，完整流程不承诺严格总运行时限；下一时段启动时按本轮确认的策略终止未结束的旧实例，再执行当前轮。
 
@@ -134,10 +134,12 @@ Linux CI 必须运行完整 pytest；Mac 本地执行同一套测试。真实 HT
 
 步骤 6 新增 tests/test_http_integration.py：本机回环 HTTP 服务验证重定向、完整正文耗时、实际读取超时、连接失败、协议错误和重试；主流程配合真实 SQLite、邮件生成及 SMTP 替身，验证通知失败保留和恢复后汇总。CI 的 Ubuntu job 使用 Python 3.12、uv 0.9.28、uv sync --locked 和 uv run --locked pytest，无 Gmail Secrets。补充 10 行英文 README、双语项目说明、部署维护与测试说明；用户于 2026-10-18 确认 Mac 本地真实测试通过；该结果单独记录为用户反馈，不代表 Linux 生产主机已验收。
 
-步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。首版为 v0.1.0；用户验收授权前不打标签。当前步骤已实现 release workflow 与发布前校验脚本，详细操作见 [发布说明](../releases.md)；尚未实际创建 Release。
+步骤 7 增加 v* 标签触发的 Actions，检出标签、uv sync --locked、运行 pytest，核对标签版本等于 pyproject.toml version，并确认提交属于已合并 main，再以发布 job 的 contents: write 权限创建 Release 和自动生成说明。重复执行时已有 Release 则跳过创建。PR #19 合并并获得用户授权后，已为 76ada0b 推送 v0.1.0；实际 Linux Release workflow 的 271 项 pytest 通过，随后创建正式 Release。详细操作与证据见 [发布说明](../releases.md#v010-正式发布记录)。
 
 README 保持 5–10 行，集中回答每五分钟运行、故障告警和生产前补充；链接根目录 [PROJECT_GUIDE.md 英文版](../../PROJECT_GUIDE.md) 和 [PROJECT_GUIDE_CN.md 中文版](../../PROJECT_GUIDE_CN.md)，介绍功能、技术栈、模块、运行逻辑、安装配置和部署，并逐项解释生产准备建议。详细 cron、Gmail 配置、SQLite 维护及验证证据继续由 docs/ 文档维护。升级方案包括独立心跳监控、专业调度平台、告警抑制/升级策略、凭证管理和数据保留策略。
 
 ## 6. 实施顺序与审阅
 
 以根目录 [TODO](../../TODO.md) 的 Issue 链接为准。步骤 0 文档审阅合并后，按 1 配置 → 2 检查 → 3 存储 → 4 邮件 → 5 集成调度 → 6 验收文档 → 7 发布逐项推进。每一步独立分支、Issue、PR；不提前实施后续任务。后续技术细节有变动先更新设计并与用户确认。
+
+初版全部步骤已完成。公开前的文档收尾由 [Issue #20](https://github.com/ACienZ/canlah-healthcheck/issues/20) 独立追踪；按用户选择采用 [MIT 许可证](../../LICENSE)，署名 2026 ACienZ，并同步包元数据与双语 README。
