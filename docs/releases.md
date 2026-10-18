@@ -1,6 +1,15 @@
 # GitHub Release 发布
 
-初版版本为 `0.1.0`，对应标签 `v0.1.0`。使用 GitHub Actions 和 GitHub Release，不发布到 PyPI；下载内容使用 GitHub 为标签提供的源码 ZIP/tar.gz，不额外上传 wheel 或运行数据。
+项目版本为 `0.1.1`，对应标签 `v0.1.1`；版本 PR 合并后才推送标签，实际发布结果以仓库 Release 和对应 Actions 为准。使用 GitHub Actions 和 GitHub Release，不发布到 PyPI；下载内容使用 GitHub 为标签提供的源码 ZIP/tar.gz，不额外上传 wheel 或运行数据。
+
+## v0.1.1 发布准备
+
+[PR #21](https://github.com/ACienZ/canlah-healthcheck/pull/21) 已将 MIT LICENSE、包许可证元数据和文档收尾合并到 main（cbd135b）。旧 v0.1.0 快照不含这些文件，因此通过 [Issue #22](https://github.com/ACienZ/canlah-healthcheck/issues/22) 准备新版本：
+
+- 将 pyproject.toml 与 uv.lock 的项目版本更新为 0.1.1，保留现有依赖和业务行为。
+- 新源码归档应包含 LICENSE，包元数据应声明 MIT；构建检查同时确认真实配置与运行数据仍被排除。
+- 用户合并版本 PR 后，在实际合并提交上验收并推送 v0.1.1，由现有 Actions 测试通过后创建新的正式 Release，再核对源码下载内容及 Latest 标记。
+- 保留 v0.1.0 标签和历史归档，不重新指向新提交。此处记录发布准备，不代表 v0.1.1 已经发布；实际结果以仓库 Release 和对应 Actions 为准。
 
 ## v0.1.0 正式发布记录
 
@@ -13,7 +22,7 @@
 - 下载实际 GitHub 源码 tar.gz 检查，共 50 个文件，必要源码、锁文件、双语文档及示例配置齐全；无真实 config.yaml、数据库、日志、.vscode/ 或 .venv/。
 - Issue #11 已关闭，Project 为 Done；同一提交的 main 与标签普通 Tests CI 也均通过。
 
-公开前通过独立 PR 添加 MIT LICENSE 并同步完成记录；v0.1.0 标签及其源码快照保持不变。后续版本从合并后的代码按相同测试门禁发布。
+公开前已通过 PR #21 添加 MIT LICENSE 并同步完成记录；v0.1.0 标签及其源码快照保持不变。包含许可证的新归档通过上述 v0.1.1 版本发布。
 
 ## 什么时候会发布
 
@@ -24,15 +33,15 @@
 1. `verify-and-test` 只有仓库读取权限。检出标签并取回完整 Git 历史，用 `scripts/verify_release.py` 确认标签等于 `v` 加包版本、当前检出提交就是标签提交、提交已进入 `origin/main`。然后执行 `uv sync --locked` 和 `uv run --locked pytest`。
 2. `publish` 依赖第一项成功后才启动，并单独取得 `contents: write`。先读取完整 Release 列表；同名 Release 已存在就保留，否则运行 `gh release create --verify-tag --generate-notes`，由 GitHub 根据历史生成发布说明。
 
-main 可能已有更新，所以标签不必指向 main 最新提交，但必须指向它历史中的提交。普通标签和带说明的标签都支持；下面首次发布步骤使用带说明的标签。
+main 可能已有更新，所以标签不必指向 main 最新提交，但必须指向它历史中的提交。普通标签和带说明的标签都支持；下面的发布步骤使用带说明的标签。
 
 任意校验、依赖安装或测试失败都会跳过 `publish`。查询 Release 的网络、认证或权限错误也会停止，不能当成“版本不存在”。同一标签的运行排队，重复执行不覆盖现有说明或资产。workflow 不需要额外配置 PAT 或 Gmail Secrets，使用本次运行的 `GITHUB_TOKEN`；仓库或组织的权限策略仍须允许创建 Release。
 
 权限、任务依赖和标签触发规则见 [GitHub Actions 官方说明](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)；`--verify-tag` 要求标签已经存在，`--generate-notes` 调用 GitHub 自动生成说明，见 [GitHub CLI 文档](https://cli.github.com/manual/gh_release_create)。Release 列表使用 [gh api 的分页功能](https://cli.github.com/manual/gh_api)，避免只检查第一页。
 
-## 首次发布的操作顺序
+## 合并后的发布操作
 
-**以下保留首次发布的操作过程；v0.1.0 已发布，不要重复创建或移动该标签。后续版本应替换为已审阅的新版本号，且须在 PR 合并、验收完成并获用户发版授权后执行。**
+**以下命令用于 v0.1.1，仅在对应版本 PR 已合并、验收完成且用户授权发版后执行。v0.1.0 已发布，不重复创建或移动旧标签。**
 
 1. 确认工作区没有未提交的项目改动，再切换到 main 并同步：
 
@@ -49,23 +58,23 @@ main 可能已有更新，所以标签不必指向 main 最新提交，但必须
    ```sh
    uv run --locked python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
    git log -1 --oneline
-   git tag --list v0.1.0
+   git tag --list v0.1.1
    gh release list --repo ACienZ/canlah-healthcheck
    ```
 
 3. 获得授权后创建标签，先在本地验证，再只推送这个标签：
 
    ```sh
-   git tag -a v0.1.0 -m "Release v0.1.0"
-   uv run --locked python scripts/verify_release.py v0.1.0
-   git push origin v0.1.0
+   git tag -a v0.1.1 -m "Release v0.1.1"
+   uv run --locked python scripts/verify_release.py v0.1.1
+   git push origin v0.1.1
    ```
 
 4. 打开仓库 Actions，查看名称为 `Release` 的运行：先确认 `verify-and-test` 完整 pytest 通过，再确认 `publish` 成功。也可以用以下只读命令查看：
 
    ```sh
    gh run list --repo ACienZ/canlah-healthcheck --workflow release.yml --limit 5
-   gh release view v0.1.0 --repo ACienZ/canlah-healthcheck
+   gh release view v0.1.1 --repo ACienZ/canlah-healthcheck
    ```
 
 5. 打开 Release 页面，检查标签、目标提交、自动生成说明和源码下载链接。自动说明是否完整仍需人工查看，尤其是首次发布；必要时在 GitHub 页面编辑说明，不重打标签。

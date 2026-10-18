@@ -242,7 +242,7 @@ The latest recorded local full-suite result is 271 passing tests. GitHub Actions
 
 ## Releases
 
-Once the release workflow is merged and publishing is authorized, push a tag matching the version in `pyproject.toml`, for example `v0.1.0`, to GitHub. Actions verifies that the tagged commit is already in `main`, installs locked dependencies, and runs the complete pytest suite. Only after these steps pass does a separate job create a GitHub Release with generated release notes.
+Version `0.1.1` includes the MIT license in its source archive. After the version PR is merged and publishing is authorized, push the matching `v0.1.1` tag to GitHub. Actions verifies that the tagged commit is already in `main`, installs locked dependencies, and runs the complete pytest suite. Only after these steps pass does a separate job create a GitHub Release with generated release notes. Keep the existing `v0.1.0` tag unchanged; its source snapshot does not contain the license file. Check the repository's actual Release page for publication status.
 
 Reruns preserve an existing Release. Version mismatches, unmerged commits, failed tests, or failed release queries prevent creation. Releases use GitHub's source ZIP/tar.gz archives; nothing is published to PyPI and no extra wheel is uploaded. See the [release guide](docs/releases.md) for commands, troubleshooting, and authorization before the first release.
 

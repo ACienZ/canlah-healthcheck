@@ -1,10 +1,11 @@
 # Canlah Healthcheck TODO
 
-更新日期：2026-10-18。初版步骤 0–7 已全部完成，v0.1.0 已发布。
+更新日期：2026-10-18。初版步骤 0–7 已全部完成，v0.1.0 已发布；v0.1.1 正在准备，包含 MIT 许可证。
 
 - Project：[Canlah_healthcheck Tracker](https://github.com/users/ACienZ/projects/12/views/1)。
 - 初版发布：[步骤 7 #11](https://github.com/ACienZ/canlah-healthcheck/issues/11) 已关闭，[v0.1.0](https://github.com/ACienZ/canlah-healthcheck/releases/tag/v0.1.0) 已发布。
-- 公开前收尾：[Issue #20](https://github.com/ACienZ/canlah-healthcheck/issues/20)，实施分支 `codex/20-publication-docs-mit`；审阅与合并状态以该 Issue 和 Project 为准。
+- 公开前收尾：[Issue #20](https://github.com/ACienZ/canlah-healthcheck/issues/20) 已关闭、PR #21 已合并，MIT 文件及包元数据已进入 main。
+- 新版本任务：[Issue #22](https://github.com/ACienZ/canlah-healthcheck/issues/22)，实施分支 `codex/22-release-v0.1.1`；审阅、合并与发布结果以该 Issue、Project 和实际 Release 为准。
 - 设计：[实施设计与接口](docs/planning/implementation-plan.md)。
 - 保留 [Issue #3：注意git流程](https://github.com/ACienZ/canlah-healthcheck/issues/3) 及其现有状态、标签。
 
@@ -150,6 +151,14 @@
 - [x] 按用户选择添加 MIT LICENSE（2026 ACienZ）、包许可证元数据和双语 README 入口。
 - [x] 完整 pytest 271 项通过（10.83 秒）；121 处文档链接/章节及 README 各 10 行检查通过；uv sync --locked 与 sdist/wheel 构建通过，归档含 MIT 文件，wheel 声明 MIT 元数据，真实配置与运行数据仍排除。
 - 本收尾使用独立 PR 交付，由用户合并后自行公开仓库与 Project；不移动 v0.1.0 标签或改写已发布归档。
+
+## v0.1.1 准备记录
+
+- [x] PR #21 已合并（cbd135b），Issue #20 已关闭、Project 为 Done；从最新 main 创建 Issue #22 对应分支。
+- [x] 将 main 的 protect-main Ruleset 合并方式限制为 Squash；回读核对仅此项变化，PR、pytest、最新 main、讨论解决、禁止删除和强推等规则保持不变。
+- [x] 项目版本更新为 0.1.1，同步 uv.lock，不升级依赖；更新双语指南与发布说明。
+- [x] uv sync --locked 成功，完整 pytest 271 项通过（11.12 秒）；123 处文档链接/章节和两份 README 各 10 行检查通过；sdist/wheel 的版本、MIT 内容及运行数据排除检查通过。
+- v0.1.0 的源码快照没有 LICENSE。版本 PR 合并后，按 [发布步骤](docs/releases.md#合并后的发布操作) 创建 v0.1.1，使新归档携带 MIT；不移动旧标签，不提前将新版本记为已发布。
 
 ## 实施边界
 

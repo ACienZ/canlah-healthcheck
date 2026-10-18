@@ -142,4 +142,4 @@ README 保持 5–10 行，集中回答每五分钟运行、故障告警和生�
 
 以根目录 [TODO](../../TODO.md) 的 Issue 链接为准。步骤 0 文档审阅合并后，按 1 配置 → 2 检查 → 3 存储 → 4 邮件 → 5 集成调度 → 6 验收文档 → 7 发布逐项推进。每一步独立分支、Issue、PR；不提前实施后续任务。后续技术细节有变动先更新设计并与用户确认。
 
-初版全部步骤已完成。公开前的文档收尾由 [Issue #20](https://github.com/ACienZ/canlah-healthcheck/issues/20) 独立追踪；按用户选择采用 [MIT 许可证](../../LICENSE)，署名 2026 ACienZ，并同步包元数据与双语 README。
+初版全部步骤已完成。公开前的文档与 [MIT 许可证](../../LICENSE) 收尾已通过 Issue #20、PR #21 合并，署名 2026 ACienZ，包元数据与双语 README 已同步。旧 v0.1.0 快照没有许可证，因此 [Issue #22](https://github.com/ACienZ/canlah-healthcheck/issues/22) 准备 v0.1.1：版本与锁文件同步，合并后再推送新标签，实际发布状态以 [发布说明](../releases.md#v011-发布准备) 中的记录及 GitHub Release 为准。
