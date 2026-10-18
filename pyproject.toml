@@ -1,6 +1,6 @@
 [project]
 name = "canlah-healthcheck"
-version = "0.1.0"
+version = "0.1.1"
 description = "Canlah website healthcheck exercise"
 license = "MIT"
 license-files = ["LICENSE"]

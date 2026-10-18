@@ -242,7 +242,7 @@ uv run --locked pytest tests/test_http_integration.py -v
 
 ## 版本发布
 
-合并发布流程并确认可以发版后，向 GitHub 推送与 `pyproject.toml` 版本一致的标签，例如 `v0.1.0`。Actions 先确认标签提交已经进入 `main`，再安装锁定依赖并运行完整 pytest；全部通过后，才由独立 job 创建 GitHub Release 和自动生成的发布说明。
+`0.1.1` 版本的源码归档包含 MIT 许可证。版本 PR 合并并确认可以发版后，向 GitHub 推送对应的 `v0.1.1` 标签。Actions 先确认标签提交已经进入 `main`，再安装锁定依赖并运行完整 pytest；全部通过后，才由独立 job 创建 GitHub Release 和自动生成的发布说明。保留已有 `v0.1.0` 标签，其源码快照没有许可证文件；是否已发布以仓库实际 Release 页面为准。
 
 重复执行会保留已有 Release；版本不匹配、提交未合并、测试失败或查询失败都会阻止创建。使用 GitHub 提供的源码 ZIP/tar.gz，不上传 PyPI，也不额外上传 wheel。发版命令、失败排查及首次发布的授权步骤见 [发布说明](docs/releases.md)。
 
