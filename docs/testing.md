@@ -73,7 +73,7 @@ workflow 使用只读仓库权限和十分钟超时，不配置 Gmail Secrets，
 
 ## 步骤 7 验证记录
 
-2026-10-18，Mac / Python 3.12.12 / uv 0.9.28：
+以下为 2026-10-18 正式发版前的本地验证，Mac / Python 3.12.12 / uv 0.9.28：
 
 - `uv run --locked pytest tests/test_release.py -q`：17 项通过，4.03 秒。
 - `uv run --locked pytest`：271 项通过，10.74 秒；包含原有 254 项和新增发布测试。
@@ -81,9 +81,16 @@ workflow 使用只读仓库权限和十分钟超时，不配置 Gmail Secrets，
 - 从实际 release.yml 读取发布 bash 并执行，假 gh 验证不存在时创建、已有时跳过、标签精确匹配、查询失败停止和创建失败返回非零；workflow 结构检查确认测试任务先于有写权限的发布任务。
 - `uv build --out-dir /tmp/canlah-task7-dist`：sdist 与 wheel 构建通过；归档检查确认源码含发布脚本、workflow、测试与文档，源码及 wheel 均排除真实配置、数据库、锁、日志和 .vscode/。
 - 114 处本地 Markdown 文件/章节链接、双语命令一致性、两份 README 各 10 行、发布 bash 语法与完整暂存 diff 检查通过。
-- 真实 `gh api --paginate` 只读查询成功，仓库当前没有 Release；没有执行真实创建命令。
+- 当时真实 `gh api --paginate` 只读查询成功，仓库尚无 Release；本地验证阶段没有执行真实创建命令。
 
-本地验证不等于标签 workflow 已在 GitHub 执行；PR 推送后的普通 CI 与首次获授权打标签后的 Release 运行分别核对，不为验证 workflow 提前发布。
+随后已分别核对普通 CI 与真实标签触发的发布运行：
+
+- [PR #19 的 Ubuntu/Python 3.12 CI](https://github.com/ACienZ/canlah-healthcheck/actions/runs/39096616003)：271 项通过（8.33 秒）。
+- 用户合并 PR #19 后，本地在实际合并提交 `76ada0b` 执行 `uv sync --locked` 成功，完整 pytest 271 项通过（13.64 秒）。
+- 用户授权推送 v0.1.0 后，[正式 Release Actions](https://github.com/ACienZ/canlah-healthcheck/actions/runs/39096892581) 的 Linux 完整 pytest 271 项通过（7.75 秒），随后发布任务成功创建 [v0.1.0](https://github.com/ACienZ/canlah-healthcheck/releases/tag/v0.1.0)。
+- 同一提交的 [main Tests CI](https://github.com/ACienZ/canlah-healthcheck/actions/runs/39096753303) 和 [标签 Tests CI](https://github.com/ACienZ/canlah-healthcheck/actions/runs/39096892582) 均成功；实际发布说明和源码归档已检查，详见 [正式发布记录](releases.md#v010-正式发布记录)。
+
+本地发布测试、普通 CI 与实际创建 Release 是三类验证；均未通过业务测试连接真实 Gmail 或安装系统 cron。用户的 Mac 真实运行反馈和 Linux 生产主机验收仍按前述边界区分。
 
 ## 真实验证方法与已知边界
 

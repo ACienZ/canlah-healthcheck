@@ -1,10 +1,10 @@
 # Canlah Healthcheck TODO
 
-更新日期：2026-10-18。当前进行步骤 7：首次发布自动化。
+更新日期：2026-10-18。初版步骤 0–7 已全部完成，v0.1.0 已发布。
 
 - Project：[Canlah_healthcheck Tracker](https://github.com/users/ACienZ/projects/12/views/1)。
-- 当前 Issue：[步骤 7 #11](https://github.com/ACienZ/canlah-healthcheck/issues/11)。
-- 当前分支：`codex/11-release-automation`。
+- 初版发布：[步骤 7 #11](https://github.com/ACienZ/canlah-healthcheck/issues/11) 已关闭，[v0.1.0](https://github.com/ACienZ/canlah-healthcheck/releases/tag/v0.1.0) 已发布。
+- 公开前收尾：[Issue #20](https://github.com/ACienZ/canlah-healthcheck/issues/20)，实施分支 `codex/20-publication-docs-mit`；审阅与合并状态以该 Issue 和 Project 为准。
 - 设计：[实施设计与接口](docs/planning/implementation-plan.md)。
 - 保留 [Issue #3：注意git流程](https://github.com/ACienZ/canlah-healthcheck/issues/3) 及其现有状态、标签。
 
@@ -17,7 +17,7 @@
 
 ## 任务顺序
 
-各任务统一 P1。步骤 0–6 已 Done，步骤 7 为 In progress。前置任务为上一行，须经用户审阅合并后开始。合并前不标记 Done。
+各任务统一 P1。步骤 0–7 已 Done，均已由用户审阅合并；后续任务继续使用独立 Issue、分支和 PR。
 
 | 步骤 | Issue | 状态 | Size |
 | --- | --- | --- | --- |
@@ -28,7 +28,7 @@
 | 4 | [Gmail SMTP 汇总告警](https://github.com/ACienZ/canlah-healthcheck/issues/8) | Done | M |
 | 5 | [命令入口与 cron 调度](https://github.com/ACienZ/canlah-healthcheck/issues/9) | Done | M |
 | 6 | [集成验证、CI 与说明文档](https://github.com/ACienZ/canlah-healthcheck/issues/10) | Done | M |
-| 7 | [首次发布自动化](https://github.com/ACienZ/canlah-healthcheck/issues/11) | In progress | M |
+| 7 | [首次发布自动化](https://github.com/ACienZ/canlah-healthcheck/issues/11) | Done | M |
 
 ## 步骤 0 验收记录
 
@@ -128,7 +128,7 @@
 - [x] 用户已审阅实现及文档，授权提交、推送并创建 PR；提交包含 Codex 共同作者署名。
 - [x] 用户已合并 PR #18、关闭 Issue #10 并删除远端分支；Project 为 Done，合并提交 dfed3db。
 
-## 当前子任务：步骤 7
+## 步骤 7 验收记录
 
 - [x] 核对 PR #18 已合并、Issue #10 已关闭；将 Project 中 Issue #11 设为 In progress。
 - [x] 从最新 main（dfed3db）创建并关联 codex/11-release-automation，本地已切换并跟踪远端同名分支。
@@ -139,12 +139,22 @@
 - [x] 发布专项 17 项、完整 pytest 271 项通过；sdist/wheel 构建通过，源码包含发布脚本与文档。
 - [x] 已检查完整暂存 diff（含新增文件）、114 处本地文档链接、双语命令、README 行数、发布 shell 语法及归档内容；未纳入 .vscode/。
 - [x] 用户已审阅实现及发布步骤，授权 commit、推送与创建 PR；提交包含 Codex 共同作者署名。
-- [ ] 用户审阅合并 PR、关闭 Issue 并删除分支；首次发布另在合并后授权推送标签。
+- [x] 用户已合并 PR #19（76ada0b）、关闭 Issue #11 并删除远端分支；Project 为 Done。
+- [x] 获得用户发版授权后，同步 main，在实际合并提交上运行完整 pytest：271 项通过（13.64 秒），再推送带说明标签 v0.1.0。
+- [x] [正式 Release Actions](https://github.com/ACienZ/canlah-healthcheck/actions/runs/39096892581) 校验成功，Linux 完整 pytest 271 项通过（7.75 秒），随后成功创建 [v0.1.0](https://github.com/ACienZ/canlah-healthcheck/releases/tag/v0.1.0)。
+- [x] 核对自动发布说明及 GitHub 源码归档：必要文件齐全，不含真实配置、数据库、日志或本地环境文件；发布详情见 [发布记录](docs/releases.md#v010-正式发布记录)。
+
+## 公开前收尾记录
+
+- [x] 关联 [Issue #20](https://github.com/ACienZ/canlah-healthcheck/issues/20)，同步 TODO、设计、测试与正式发布记录。
+- [x] 按用户选择添加 MIT LICENSE（2026 ACienZ）、包许可证元数据和双语 README 入口。
+- [x] 完整 pytest 271 项通过（10.83 秒）；121 处文档链接/章节及 README 各 10 行检查通过；uv sync --locked 与 sdist/wheel 构建通过，归档含 MIT 文件，wheel 声明 MIT 元数据，真实配置与运行数据仍排除。
+- 本收尾使用独立 PR 交付，由用户合并后自行公开仓库与 Project；不移动 v0.1.0 标签或改写已发布归档。
 
 ## 实施边界
 
-步骤 1–6 已合并，历史验收记录见 [配置说明](docs/configuration.md)、[检查说明](docs/checker.md)、[存储说明](docs/storage.md)、[邮件说明](docs/notifier.md) 和 [命令与调度说明](docs/scheduling.md)。
+步骤 0–7 已合并并完成初版发布，历史验收记录见 [配置说明](docs/configuration.md)、[检查说明](docs/checker.md)、[存储说明](docs/storage.md)、[邮件说明](docs/notifier.md) 和 [命令与调度说明](docs/scheduling.md)。
 
-步骤 6 补充本机 HTTP 集成测试、业务 pytest CI 和使用说明。用户已确认 Mac 本地真实测试通过；本步骤的自动测试不安装系统定时任务、不读取真实配置或发送真实邮件。步骤 7 在当前分支实现发布自动化，首版标签仍须合并并获得用户授权后再推送。
+步骤 6 补充本机 HTTP 集成测试、业务 pytest CI 和使用说明。用户已确认 Mac 本地真实测试通过；自动测试不安装系统定时任务、不读取真实配置或发送真实邮件。步骤 7 的发布自动化已在 v0.1.0 标签上实际运行成功；Linux 生产主机部署仍需单独验收。
 
-环境复现：`uv sync --locked`。统一测试命令：`uv run --locked pytest`，本地完整验证为 271 项通过（10.74 秒）；新增 17 项发布测试，仅使用临时 Git 仓库和假 gh，未实际推送标签或发布。文档入口见 [中文说明](PROJECT_GUIDE_CN.md) / [English guide](PROJECT_GUIDE.md)，详见 [部署维护](docs/deployment.md) 和 [测试证据](docs/testing.md)；[英文 README](README.md) 与 [中文 README](README_CN.md) 各 10 行。
+环境复现：`uv sync --locked`。统一测试命令：`uv run --locked pytest`。合并提交的本地完整验证为 271 项通过，正式标签的 Linux Release CI 也为 271 项通过；其中 17 项发布单元测试使用临时 Git 仓库和假 gh，与真实发布运行分开记录。文档入口见 [中文说明](PROJECT_GUIDE_CN.md) / [English guide](PROJECT_GUIDE.md)，详见 [部署维护](docs/deployment.md)、[测试证据](docs/testing.md) 和 [发布记录](docs/releases.md)；[英文 README](README.md) 与 [中文 README](README_CN.md) 各 10 行。

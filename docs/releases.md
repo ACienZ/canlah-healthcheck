@@ -2,6 +2,19 @@
 
 初版版本为 `0.1.0`，对应标签 `v0.1.0`。使用 GitHub Actions 和 GitHub Release，不发布到 PyPI；下载内容使用 GitHub 为标签提供的源码 ZIP/tar.gz，不额外上传 wheel 或运行数据。
 
+## v0.1.0 正式发布记录
+
+2026-10-18 已完成正式发布：
+
+- 用户合并 [PR #19](https://github.com/ACienZ/canlah-healthcheck/pull/19) 后授权发版；标签 v0.1.0 指向合并提交 `76ada0b14cc5247333e0cd13f21088cae4de7fba`。
+- 实际合并提交本地 `uv sync --locked` 成功，完整 pytest 271 项通过（13.64 秒）；发布前标签校验通过。
+- [Release Actions](https://github.com/ACienZ/canlah-healthcheck/actions/runs/39096892581) 的 Linux 完整 pytest 271 项通过（7.75 秒），随后 publish job 成功。
+- [v0.1.0 Release](https://github.com/ACienZ/canlah-healthcheck/releases/tag/v0.1.0) 于 04:23:26 UTC（13:23:26 JST）发布，非草稿、非预发布；自动说明已核对。
+- 下载实际 GitHub 源码 tar.gz 检查，共 50 个文件，必要源码、锁文件、双语文档及示例配置齐全；无真实 config.yaml、数据库、日志、.vscode/ 或 .venv/。
+- Issue #11 已关闭，Project 为 Done；同一提交的 main 与标签普通 Tests CI 也均通过。
+
+公开前通过独立 PR 添加 MIT LICENSE 并同步完成记录；v0.1.0 标签及其源码快照保持不变。后续版本从合并后的代码按相同测试门禁发布。
+
 ## 什么时候会发布
 
 `.github/workflows/release.yml` 只在推送 `v*` 标签时运行。普通 commit、分支推送和 PR 合并不会直接发版。`docs:`、`feat:` 等提交前缀用于说明改动，不会自动决定或修改版本号；升级时仍须在独立 PR 中同步 `pyproject.toml` 和 `uv.lock`。
@@ -19,7 +32,7 @@ main 可能已有更新，所以标签不必指向 main 最新提交，但必须
 
 ## 首次发布的操作顺序
 
-**只有本步骤 PR 已合并、初版验收完成且用户明确授权发版后，才执行下面的打标签和推送命令。当前实现阶段没有执行这些命令。**
+**以下保留首次发布的操作过程；v0.1.0 已发布，不要重复创建或移动该标签。后续版本应替换为已审阅的新版本号，且须在 PR 合并、验收完成并获用户发版授权后执行。**
 
 1. 确认工作区没有未提交的项目改动，再切换到 main 并同步：
 
@@ -65,4 +78,4 @@ main 可能已有更新，所以标签不必指向 main 最新提交，但必须
 - 网络、依赖下载或 GitHub 权限等临时故障：解决原因后，可以在该次 Actions 页面选择 Re-run failed jobs；若重跑全部任务，会再次运行完整测试。
 - 已有 Release：直接跳过创建，保留原说明和资产，不执行更新或删除命令。已有草稿也按“已存在”处理，需要人工确认其后续状态。
 
-本地 `uv run --locked pytest tests/test_release.py -v` 使用临时 Git 仓库和假 `gh` 验证发布判断及失败停止；不会在本项目打标签或访问 GitHub。完整标签触发、Actions 写权限和 Release 创建，仍以首次获授权推送标签后的实际结果为准。
+本地 `uv run --locked pytest tests/test_release.py -v` 使用临时 Git 仓库和假 `gh` 验证发布判断及失败停止；不会在本项目打标签或访问 GitHub。完整标签触发、Actions 写权限和 Release 创建已通过上述首次正式发布验证；后续版本仍需核对对应标签的实际 Actions 结果。

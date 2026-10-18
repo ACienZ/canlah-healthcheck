@@ -1,5 +1,5 @@
 # Canlah Healthcheck
-[English README](README.md)
+[English README](README.md) · [MIT 许可证](LICENSE)
 - 安装、功能、模块、运行逻辑、配置及部署：[英文指南](PROJECT_GUIDE.md) / [中文说明](PROJECT_GUIDE_CN.md)。
 - 定时运行、故障告警及生产准备：
   - 默认每五分钟由 UTC cron（`*/5 * * * *`）调用 `scripts/run_healthcheck.sh`，传入 uv 与配置的绝对路径，并将输出追加到日志；用 `scripts/print_cron.py` 根据 `schedule.interval_minutes` 生成条目，再通过 `crontab -e` 追加；修改周期后须更新 crontab。
